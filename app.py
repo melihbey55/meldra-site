@@ -83,7 +83,7 @@ def kelime_sayiyi_rakamla(metin):
 
 def hesapla(metin):
     try:
-        if re.fullmatch(r'[\d\.\+\-\*\/\(\) ]+', metin):
+        if re.fullmatch(r'[\d\.\+\-\*\/ ]+', metin):
             return str(eval(metin, {"__builtins__": None}, {}))
     except: return None
     return None
@@ -142,21 +142,46 @@ def mesajdaki_sehir(mesaj):
 # -----------------------------
 def wiki_ara(konu):
     try:
-        headers = {"User-Agent": "MeldraBot/1.0"}
         search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
-        res = requests.get(search_url, headers=headers, timeout=10).json()
-        results = res.get("query", {}).get("search", [])
-        if not results:
-            return None
-        title = results[0]["title"]
-        summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
-        summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
-        extract = summary_res.get("extract")
-        if extract:
-            return extract
+        res = requests.get(search_url, timeout=10).json()
+        search_results = res.get("query", {}).get("search", [])
+        if search_results:
+            title = search_results[0]["title"]
+            summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
+            summary_res = requests.get(summary_url, timeout=10).json()
+            if "extract" in summary_res:
+                return summary_res["extract"]
     except:
         return None
     return None
+
+# -----------------------------
+# WikiHow API
+# -----------------------------
+WIKIHOW_API_KEY = "YOUR_API_KEY"
+
+def wikihow_ara(konu):
+    try:
+        url = f"https://api.apieco.ir/wikihow/steps?count=1"
+        headers = {"apieco-key": WIKIHOW_API_KEY}
+        res = requests.get(url, headers=headers, timeout=10).json()
+        if res and "steps" in res:
+            steps = res["steps"]
+            return "\n".join([step["step"] for step in steps])
+    except:
+        return None
+    return None
+
+# -----------------------------
+# Yemek Tarifleri
+# -----------------------------
+def yemek_tarifi_ara(konu):
+    tarifler = {
+        "makarna": "Makarnayı haşlayın, sos hazırlayın ve karıştırın.",
+        "kumpir": "Patatesleri haşlayın, içini açın ve malzemeleri ekleyin.",
+        "kısır": "Bulguru sıcak suyla ıslatın, sebzeleri doğrayın ve karıştırın."
+    }
+    return tarifler.get(konu.lower(), None)
 
 # -----------------------------
 # Cevap motoru
@@ -182,78 +207,4 @@ def cevap_ver(mesaj, user_id="default"):
         king_mode.add(user_id)
         return "👑 Öğrenme modu aktif!"
 
-    if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
-        try:
-            soru = mesaj_lc.split("soru:",1)[1].split("cevap:",1)[0].strip()
-            cevap = mesaj_lc.split("cevap:",1)[1].strip()
-            if soru and cevap:
-                nlp_data_local = load_json(NLP_FILE)
-                nlp_data_local.append({"triggers":[soru], "responses":[cevap]})
-                save_json(NLP_FILE, nlp_data_local)
-                global nlp_data
-                nlp_data = nlp_data_local
-                kaydet_context(user_id, soru, cevap)
-                return f"✅ '{soru}' sorusunu öğrendim."
-        except:
-            return "⚠️ Hatalı format."
-
-    if "öğret" in mesaj_lc: return "🤖 Sadece kral öğretebilir."
-
-    # NLP
-    nlp_resp = nlp_cevap(mesaj_raw)
-    if nlp_resp:
-        kaydet_context(user_id, mesaj_raw, nlp_resp)
-        return nlp_resp
-
-    # Matematik
-    mat_text = kelime_sayiyi_rakamla(mesaj_raw).replace("x","*")
-    mat_res = hesapla(mat_text)
-    if mat_res is not None:
-        kaydet_context(user_id, mesaj_raw, mat_res)
-        return mat_res
-
-    # Hava durumu
-    city = mesajdaki_sehir(mesaj_raw)
-    if city: return hava_durumu(city)
-
-    # Wikipedia (yalnızca diğerleri çalışmazsa)
-    wiki_sonuc = wiki_ara(mesaj_raw)
-    if wiki_sonuc:
-        kaydet_context(user_id, mesaj_raw, wiki_sonuc)
-        return wiki_sonuc
-
-    # Fallback
-    fallback = random.choice([
-        "Bunu anlamadım, tekrar sorabilir misin?",
-        "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)"
-    ])
-    kaydet_context(user_id, mesaj_raw, fallback)
-    return fallback
-
-# -----------------------------
-# Web arayüzü
-# -----------------------------
-@app.route("/")
-def index():
-    if os.path.exists(INDEX_FILE):
-        return send_from_directory(os.path.dirname(INDEX_FILE), os.path.basename(INDEX_FILE))
-    return "<h3 style='position:absolute;top:10px;left:10px;'>MELDRA çalışıyor — chat endpoint: POST /chat</h3>"
-
-@app.route("/chat", methods=["POST"])
-def chat():
-    data = request.get_json(force=True)
-    mesaj = data.get("mesaj","")
-    user_id = data.get("user_id","default")
-    cevap = cevap_ver(mesaj, user_id)
-    return jsonify({"cevap": cevap})
-
-@app.route("/_nlp_dump", methods=["GET"])
-def nlp_dump():
-    return jsonify(load_json(NLP_FILE))
-
-# -----------------------------
-# Sunucu başlatma
-# -----------------------------
-if __name__=="__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    if user_id in king_mode and mesaj_lc.startswith("soru:") and "cev6
