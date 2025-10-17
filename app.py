@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 import os, json, re, random, requests
 from difflib import SequenceMatcher
 from collections import deque
-from urllib.parse import quote_plus
+from urllib.parse import quote
 
 app = Flask(__name__)
 
@@ -121,7 +121,7 @@ def kaydet_context(user_id, mesaj, cevap):
 # -----------------------------
 def hava_durumu(sehir):
     try:
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={quote_plus(sehir.strip())}&appid={WEATHER_API_KEY}&units=metric&lang=tr"
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={quote(sehir.strip())}&appid={WEATHER_API_KEY}&units=metric&lang=tr"
         res = requests.get(url, timeout=6).json()
         cod = str(res.get("cod",""))
         if cod=="200" and "main" in res:
@@ -142,15 +142,18 @@ def mesajdaki_sehir(mesaj):
 # -----------------------------
 def wiki_ara(konu):
     try:
-        search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote_plus(konu)}&format=json"
-        res = requests.get(search_url, timeout=5).json()
-        search_results = res.get("query", {}).get("search", [])
-        if search_results:
-            title = search_results[0]["title"]
-            summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote_plus(title)}"
-            summary_res = requests.get(summary_url, timeout=5).json()
-            if "extract" in summary_res:
-                return summary_res["extract"]
+        headers = {"User-Agent": "MeldraBot/1.0"}
+        search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
+        res = requests.get(search_url, headers=headers, timeout=10).json()
+        results = res.get("query", {}).get("search", [])
+        if not results:
+            return None
+        title = results[0]["title"]
+        summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
+        summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
+        extract = summary_res.get("extract")
+        if extract:
+            return extract
     except:
         return None
     return None
@@ -196,16 +199,6 @@ def cevap_ver(mesaj, user_id="default"):
 
     if "öğret" in mesaj_lc: return "🤖 Sadece kral öğretebilir."
 
-    # Hava durumu
-    city = mesajdaki_sehir(mesaj_raw)
-    if city: return hava_durumu(city)
-
-    # Wikipedia
-    wiki_sonuc = wiki_ara(mesaj_raw)
-    if wiki_sonuc:
-        kaydet_context(user_id, mesaj_raw, wiki_sonuc)
-        return wiki_sonuc
-
     # NLP
     nlp_resp = nlp_cevap(mesaj_raw)
     if nlp_resp:
@@ -218,6 +211,16 @@ def cevap_ver(mesaj, user_id="default"):
     if mat_res is not None:
         kaydet_context(user_id, mesaj_raw, mat_res)
         return mat_res
+
+    # Hava durumu
+    city = mesajdaki_sehir(mesaj_raw)
+    if city: return hava_durumu(city)
+
+    # Wikipedia (yalnızca diğerleri çalışmazsa)
+    wiki_sonuc = wiki_ara(mesaj_raw)
+    if wiki_sonuc:
+        kaydet_context(user_id, mesaj_raw, wiki_sonuc)
+        return wiki_sonuc
 
     # Fallback
     fallback = random.choice([
@@ -249,9 +252,8 @@ def nlp_dump():
     return jsonify(load_json(NLP_FILE))
 
 # -----------------------------
-# Sunucu başlatma (Render uyumlu)
+# Sunucu başlatma
 # -----------------------------
 if __name__=="__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
