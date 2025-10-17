@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 
 # -----------------------------
-# Dosya yolları
+# Dosya yolları ve ayarlar
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NLP_FILE = os.path.join(BASE_DIR, "nlp_data.json")
@@ -26,7 +26,6 @@ TURKISH_CITIES = [
     "hatay","mardin","ordu","sakarya","mersin","tekirdag","zonguldak"
 ]
 
-# JSON dosyası yoksa oluştur
 if not os.path.exists(NLP_FILE):
     with open(NLP_FILE, "w", encoding="utf-8") as f:
         json.dump([], f, ensure_ascii=False, indent=2)
@@ -47,10 +46,8 @@ def save_json(file, data):
 # -----------------------------
 # Matematik
 # -----------------------------
-birimler = {"sıfır":0,"bir":1,"iki":2,"üç":3,"dört":4,"beş":5,
-            "altı":6,"yedi":7,"sekiz":8,"dokuz":9}
-onlar = {"on":10,"yirmi":20,"otuz":30,"kırk":40,"elli":50,
-         "altmış":60,"yetmiş":70,"seksen":80,"doksan":90}
+birimler = {"sıfır":0,"bir":1,"iki":2,"üç":3,"dört":4,"beş":5,"altı":6,"yedi":7,"sekiz":8,"dokuz":9}
+onlar = {"on":10,"yirmi":20,"otuz":30,"kırk":40,"elli":50,"altmış":60,"yetmiş":70,"seksen":80,"doksan":90}
 buyukler = {"yüz":100,"bin":1000,"milyon":1000000,"milyar":1000000000}
 islemler = {"artı":"+","eksi":"-","çarpı":"*","x":"*","bölü":"/"}
 
@@ -133,42 +130,10 @@ def mesajdaki_sehir(mesaj):
     return None
 
 # -----------------------------
-# Wikipedia araştırma
-# -----------------------------
-def wiki_ara(konu):
-    try:
-        headers = {"User-Agent": "MeldraBot/1.0"}
-        search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
-        res = requests.get(search_url, headers=headers, timeout=10).json()
-        results = res.get("query", {}).get("search", [])
-        if not results:
-            return None
-        title = results[0]["title"]
-        summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
-        summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
-        return summary_res.get("extract")
-    except:
-        return None
-
-# -----------------------------
-# DuckDuckGo API
-# -----------------------------
-def web_ara(konu):
-    try:
-        url = f"https://api.duckduckgo.com/?q={quote(konu)}&format=json&lang=tr"
-        r = requests.get(url, timeout=8).json()
-        text = r.get("AbstractText") or r.get("Heading")
-        if text:
-            return text
-    except:
-        return None
-    return None
-
-# -----------------------------
-# Yemek tarifi (TheMealDB + Nefis Yemek Tarifleri)
+# Yemek tarifi
 # -----------------------------
 def yemek_tarifi(konu):
-    # 1️⃣ TheMealDB dene
+    # TheMealDB dene
     try:
         url = f"https://www.themealdb.com/api/json/v1/1/search.php?s={quote(konu)}"
         r = requests.get(url, timeout=8).json()
@@ -178,28 +143,25 @@ def yemek_tarifi(konu):
             name = meal["strMeal"]
             instructions = meal["strInstructions"]
             return f"🍽️ {name} tarifi:\n{instructions[:600]}..."
-    except:
-        pass
+    except: pass
 
-    # 2️⃣ Nefis Yemek Tarifleri — web scraping
+    # Nefis Yemek Tarifleri
     try:
         search_url = f"https://www.nefisyemektarifleri.com/?s={quote(konu)}"
         headers = {"User-Agent": "Mozilla/5.0"}
         html = requests.get(search_url, headers=headers, timeout=10).text
         soup = BeautifulSoup(html, "html.parser")
         link = soup.select_one("div.recipe-card a")
-        if not link:
-            return None
+        if not link: return None
         detay_url = link["href"]
         detay_html = requests.get(detay_url, headers=headers, timeout=10).text
         detay_soup = BeautifulSoup(detay_html, "html.parser")
         baslik_tag = detay_soup.select_one("h1.recipe-title")
-        if not baslik_tag:
-            return None
+        adim_tags = detay_soup.select("div.recipe-preparation p")
+        if not baslik_tag or not adim_tags: return None
         baslik = baslik_tag.get_text(strip=True)
-        adimlar = detay_soup.select("div.recipe-preparation p")
-        text = " ".join([a.get_text(strip=True) for a in adimlar])[:600]
-        return f"🍳 {baslik} tarifi (Nefis Yemek Tarifleri):\n{text}..."
+        adimlar = " ".join([a.get_text(strip=True) for a in adim_tags])
+        return f"🍳 {baslik} tarifi (Nefis Yemek Tarifleri):\n{adimlar[:600]}..."
     except:
         return None
 
@@ -213,7 +175,7 @@ def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
     mesaj_lc = mesaj_raw.lower().strip()
 
-    # 🏰 Kral modu
+    # Kral modu
     if mesaj_lc=="her biji amasya":
         password_pending.add(user_id)
         return "Parolayı giriniz:"
@@ -228,6 +190,7 @@ def cevap_ver(mesaj, user_id="default"):
     if mesaj_lc in ["ben yüce kral melih çakar","ben yuce kral melih cakar"]:
         king_mode.add(user_id)
         return "👑 Öğrenme modu aktif!"
+    
     if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
         try:
             soru = mesaj_lc.split("soru:",1)[1].split("cevap:",1)[0].strip()
@@ -242,13 +205,11 @@ def cevap_ver(mesaj, user_id="default"):
                 return f"✅ '{soru}' sorusunu öğrendim."
         except:
             return "⚠️ Hatalı format."
-
-    if "öğret" in mesaj_lc: 
-        return "🤖 Sadece kral öğretebilir."
+    if "öğret" in mesaj_lc: return "🤖 Sadece kral öğretebilir."
 
     # NLP
     nlp_resp = nlp_cevap(mesaj_raw)
-    if nlp_resp:
+    if nlp_resp: 
         kaydet_context(user_id, mesaj_raw, nlp_resp)
         return nlp_resp
 
@@ -261,30 +222,16 @@ def cevap_ver(mesaj, user_id="default"):
 
     # Hava durumu
     city = mesajdaki_sehir(mesaj_raw)
-    if city: 
-        return hava_durumu(city)
+    if city: return hava_durumu(city)
 
     # Yemek tarifi
     if tarif_var_mi(mesaj_raw):
         konu = re.sub(r'(tarifi|nasıl yapılır|yapımı|tarif)', '', mesaj_raw, flags=re.IGNORECASE).strip()
         tarif = yemek_tarifi(konu)
-        if tarif:
-            return tarif
-        else:
-            return f"'{konu}' için tarif bulunamadı."
+        if tarif: return tarif
+        else: return f"'{konu}' için tarif bulunamadı."
 
-    # Wikipedia
-    wiki_sonuc = wiki_ara(mesaj_raw)
-    if wiki_sonuc:
-        kaydet_context(user_id, mesaj_raw, wiki_sonuc)
-        return wiki_sonuc
-
-    # Web araması (fallback)
-    web_sonuc = web_ara(mesaj_raw)
-    if web_sonuc:
-        kaydet_context(user_id, mesaj_raw, web_sonuc)
-        return web_sonuc
-
+    # Fallback
     fallback = random.choice([
         "Bunu anlamadım, tekrar sorabilir misin?",
         "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)"
