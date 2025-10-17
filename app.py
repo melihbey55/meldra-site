@@ -142,46 +142,21 @@ def mesajdaki_sehir(mesaj):
 # -----------------------------
 def wiki_ara(konu):
     try:
+        headers = {"User-Agent": "MeldraBot/1.0"}
         search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
-        res = requests.get(search_url, timeout=10).json()
-        search_results = res.get("query", {}).get("search", [])
-        if search_results:
-            title = search_results[0]["title"]
-            summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
-            summary_res = requests.get(summary_url, timeout=10).json()
-            if "extract" in summary_res:
-                return summary_res["extract"]
+        res = requests.get(search_url, headers=headers, timeout=10).json()
+        results = res.get("query", {}).get("search", [])
+        if not results:
+            return None
+        title = results[0]["title"]
+        summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
+        summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
+        extract = summary_res.get("extract")
+        if extract:
+            return extract
     except:
         return None
     return None
-
-# -----------------------------
-# WikiHow API
-# -----------------------------
-WIKIHOW_API_KEY = "YOUR_API_KEY"
-
-def wikihow_ara(konu):
-    try:
-        url = f"https://api.apieco.ir/wikihow/steps?count=1"
-        headers = {"apieco-key": WIKIHOW_API_KEY}
-        res = requests.get(url, headers=headers, timeout=10).json()
-        if res and "steps" in res:
-            steps = res["steps"]
-            return "\n".join([step["step"] for step in steps])
-    except:
-        return None
-    return None
-
-# -----------------------------
-# Yemek Tarifleri
-# -----------------------------
-def yemek_tarifi_ara(konu):
-    tarifler = {
-        "makarna": "Makarnayı haşlayın, sos hazırlayın ve karıştırın.",
-        "kumpir": "Patatesleri haşlayın, içini açın ve malzemeleri ekleyin.",
-        "kısır": "Bulguru sıcak suyla ıslatın, sebzeleri doğrayın ve karıştırın."
-    }
-    return tarifler.get(konu.lower(), None)
 
 # -----------------------------
 # Cevap motoru
@@ -207,4 +182,4 @@ def cevap_ver(mesaj, user_id="default"):
         king_mode.add(user_id)
         return "👑 Öğrenme modu aktif!"
 
-    if user_id in king_mode and mesaj_lc.startswith("soru:") and "cev6
+    if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
