@@ -3,11 +3,12 @@ import os, json, re, random, requests
 from difflib import SequenceMatcher
 from collections import deque
 from urllib.parse import quote
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
 # -----------------------------
-# Dosya yolları
+# Dosya yolları ve ayarlar
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NLP_FILE = os.path.join(BASE_DIR, "nlp_data.json")
@@ -52,10 +53,8 @@ def save_json(file, data):
 # -----------------------------
 # Matematik
 # -----------------------------
-birimler = {"sıfır":0,"bir":1,"iki":2,"üç":3,"dört":4,"beş":5,
-            "altı":6,"yedi":7,"sekiz":8,"dokuz":9}
-onlar = {"on":10,"yirmi":20,"otuz":30,"kırk":40,"elli":50,
-         "altmış":60,"yetmiş":70,"seksen":80,"doksan":90}
+birimler = {"sıfır":0,"bir":1,"iki":2,"üç":3,"dört":4,"beş":5,"altı":6,"yedi":7,"sekiz":8,"dokuz":9}
+onlar = {"on":10,"yirmi":20,"otuz":30,"kırk":40,"elli":50,"altmış":60,"yetmiş":70,"seksen":80,"doksan":90}
 buyukler = {"yüz":100,"bin":1000,"milyon":1000000,"milyar":1000000000}
 islemler = {"artı":"+","eksi":"-","çarpı":"*","x":"*","bölü":"/"}
 
@@ -64,7 +63,7 @@ def kelime_sayiyi_rakamla(metin):
         metin = re.sub(r'\b'+re.escape(k)+r'\b', v, metin)
     tokens, temp_sayi = [],0
     for k in metin.lower().split():
-        if k in birimlers: temp_sayi += birimler[k]
+        if k in birimler: temp_sayi += birimler[k]
         elif k in onlar: temp_sayi += onlar[k]
         elif k in buyukler:
             temp_sayi = max(temp_sayi,1) * buyukler[k]
@@ -83,7 +82,7 @@ def kelime_sayiyi_rakamla(metin):
 
 def hesapla(metin):
     try:
-        if re.fullmatch(r'[\d\.\+\-\*\/ ]+', metin):
+        if re.fullmatch(r'[\d\.\+\-\*\/\(\) ]+', metin):
             return str(eval(metin, {"__builtins__": None}, {}))
     except: return None
     return None
@@ -138,11 +137,11 @@ def mesajdaki_sehir(mesaj):
     return None
 
 # -----------------------------
-# Wikipedia araştırma
+# Wikipedia
 # -----------------------------
 def wiki_ara(konu):
     try:
-        headers = {"User-Agent": "MeldraBot/1.0 (https://example.com)"}
+        headers = {"User-Agent": "MeldraBot/1.0"}
         search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
         res = requests.get(search_url, headers=headers, timeout=10).json()
         search_results = res.get("query", {}).get("search", [])
@@ -157,180 +156,129 @@ def wiki_ara(konu):
     return None
 
 # -----------------------------
-# Geliştirilmiş WikiHow tarifleri
+# WikiHow tarifleri
 # -----------------------------
-def wikihow_tarif(konu):
+def wikihow_tarif(soru):
     try:
-        headers = {"User-Agent": "MeldraBot/1.0 (https://example.com)"}
-        
-        # WikiHow arama
-        search_url = f"https://www.wikihow.com/api.php?action=search&query={quote(konu)}&format=json"
-        res = requests.get(search_url, headers=headers, timeout=10).json()
-        
-        if "results" in res and res["results"]:
-            # İlk sonucu al
-            first_result = res["results"][0]
-            title = first_result.get("title", "Tarif")
-            page_id = first_result.get("pageid")
-            
-            # Detaylı içerik için
-            detail_url = f"https://www.wikihow.com/api.php?action=parse&pageid={page_id}&format=json"
-            detail_res = requests.get(detail_url, headers=headers, timeout=10).json()
-            
-            if "parse" in detail_res:
-                # Malzemeler ve adımları çıkarmaya çalış
-                text = detail_res["parse"].get("text", {}).get("*", "")
-                
-                # Malzemeleri bul
-                malzemeler = []
-                malzeme_match = re.findall(r'<li class="material">(.*?)</li>', text)
-                if malzeme_match:
-                    malzemeler = malzeme_match
-                else:
-                    # Alternatif malzeme arama
-                    malzeme_match = re.findall(r'<b>Malzemeler:</b>(.*?)<br/>', text, re.DOTALL)
-                    if malzeme_match:
-                        malzemeler = re.findall(r'<li>(.*?)</li>', malzeme_match[0])
-                
-                # Adımları bul
-                adimlar = []
-                adim_match = re.findall(r'<div class="step">.*?<b>(.*?)</b>.*?</div>', text, re.DOTALL)
-                if adim_match:
-                    adimlar = [re.sub(r'<.*?>', '', adim).strip() for adim in adim_match[:10]]  # İlk 10 adım
-                
-                # URL
-                url = f"https://www.wikihow.com/{first_result.get('url', '').replace(' ', '-')}"
-                
-                cevap = f"🍳 {title} - Tarif:\n\n"
-                
-                if malzemeler:
-                    cevap += "📋 **Malzemeler:**\n"
-                    for i, malzeme in enumerate(malzemeler[:15], 1):  # İlk 15 malzeme
-                        temiz_malzeme = re.sub(r'<.*?>', '', malzeme).strip()
-                        cevap += f"{i}. {temiz_malzeme}\n"
-                    cevap += "\n"
-                
-                if adimlar:
-                    cevap += "👨‍🍳 **Hazırlanışı:**\n"
-                    for i, adim in enumerate(adimlar, 1):
-                        cevap += f"{i}. {adim}\n"
-                else:
-                    cevap += f"\n🔗 Detaylı tarif için: {url}"
-                
-                return cevap
-                
-    except Exception as e:
-        print(f"WikiHow hatası: {e}")
-    
+        search_url = f"https://www.wikihow.com/wikiHowTo?search={quote(soru)}"
+        headers = {"User-Agent": "MeldraBot/1.0"}
+        res = requests.get(search_url, headers=headers, timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
+        first_link = soup.select_one("a.result_link")
+        if first_link:
+            link = "https://www.wikihow.com" + first_link["href"]
+            page_res = requests.get(link, headers=headers, timeout=10)
+            page_soup = BeautifulSoup(page_res.text, "html.parser")
+            steps = page_soup.select("div.step p, div.step")
+            text = "\n".join([s.get_text(strip=True) for s in steps if s.get_text(strip=True)])
+            if text.strip():
+                return text
+    except:
+        return None
     return None
 
 # -----------------------------
-# Geliştirilmiş Cevap motoru
+# Cevap motoru
 # -----------------------------
 def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
-    mesaj_lc = mesaj_raw.lower().strip()
+    mesaj_lc = mesaj_raw.lower()
 
     # Kral modu
-    if mesaj_lc == "her biji amasya":
+    if mesaj_lc=="her biji amasya":
         password_pending.add(user_id)
         return "Parolayı giriniz:"
-    
     if user_id in password_pending:
-        if mesaj_lc == "0567995561":
+        if mesaj_lc=="0567995561":
             password_pending.discard(user_id)
-            king_mode.add(user_id)  # Bu satırı ekledim
-            return "Kral modu aktif! Artık her şeyi yapabilirsin."
+            king_mode.add(user_id)
+            return "✅ Öğrenme modu aktif."
         else:
             password_pending.discard(user_id)
-            return "Parola yanlış!"
+            return "⛔ Yanlış parola."
 
-    # Matematik işlemleri
-    matematik_sonuc = hesapla(kelime_sayiyi_rakamla(mesaj_raw))
-    if matematik_sonuc:
-        return f"Sonuç: {matematik_sonuc}"
+    if mesaj_lc in ["ben yüce kral melih çakar","ben yuce kral melih cakar"]:
+        king_mode.add(user_id)
+        return "👑 Öğrenme modu aktif!"
+
+    if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
+        try:
+            soru = mesaj_lc.split("soru:",1)[1].split("cevap:",1)[0].strip()
+            cevap = mesaj_lc.split("cevap:",1)[1].strip()
+            if soru and cevap:
+                nlp_data_local = load_json(NLP_FILE)
+                nlp_data_local.append({"triggers":[soru], "responses":[cevap]})
+                save_json(NLP_FILE, nlp_data_local)
+                global nlp_data
+                nlp_data = nlp_data_local
+                kaydet_context(user_id, soru, cevap)
+                return f"✅ '{soru}' sorusunu öğrendim."
+        except:
+            return "⚠️ Hatalı format."
+
+    if "öğret" in mesaj_lc: return "🤖 Sadece kral öğretebilir."
 
     # Hava durumu
-    sehir = mesajdaki_sehir(mesaj_lc)
-    if sehir:
-        return hava_durumu(sehir)
+    city = mesajdaki_sehir(mesaj_raw)
+    if city: return hava_durumu(city)
 
-    # Yemek tarifi (geliştirilmiş)
-    tarif_kelimeler = ["tarif", "nasıl yapılır", "yemek tarifi", "yapılışı", "malzemeler"]
-    if any(kelime in mesaj_lc for kelime in tarif_kelimeler):
-        # Tarif konusunu çıkar
-        konu = mesaj_raw
-        for kelime in tarif_kelimeler:
-            konu = konu.lower().replace(kelime, "").strip()
-        
-        if konu:
-            tarif = wikihow_tarif(konu + " tarifi")
-            if tarif:
-                return tarif
-            else:
-                return f"'{konu}' için detaylı tarif bulamadım. Daha basit bir açıklama yapabilir misin?"
+    # WikiHow
+    wh_tarif = wikihow_tarif(mesaj_raw)
+    if wh_tarif:
+        kaydet_context(user_id, mesaj_raw, wh_tarif)
+        return wh_tarif
 
-    # WikiHow genel
-    if mesaj_lc.startswith("nasıl") or " nasıl " in mesaj_lc or "yapılır" in mesaj_lc:
-        tarif = wikihow_tarif(mesaj_raw)
-        if tarif:
-            return tarif
+    # Wikipedia
+    wiki_sonuc = wiki_ara(mesaj_raw)
+    if wiki_sonuc:
+        kaydet_context(user_id, mesaj_raw, wiki_sonuc)
+        return wiki_sonuc
 
-    # Wikipedia araştırma
-    if mesaj_lc.startswith("araştır") or mesaj_lc.startswith("wiki"):
-        konu = mesaj_lc.replace("araştır", "").replace("wiki", "").strip()
-        if konu:
-            bilgi = wiki_ara(konu)
-            if bilgi:
-                return f"🔍 {konu.title()} hakkında:\n\n{bilgi[:500]}..." if len(bilgi) > 500 else bilgi
-            else:
-                return f"'{konu}' hakkında bilgi bulamadım."
+    # NLP
+    nlp_resp = nlp_cevap(mesaj_raw)
+    if nlp_resp:
+        kaydet_context(user_id, mesaj_raw, nlp_resp)
+        return nlp_resp
 
-    # NLP yanıtları
-    nlp_yaniti = nlp_cevap(mesaj_raw)
-    if nlp_yaniti:
-        return nlp_yaniti
+    # Matematik
+    mat_text = kelime_sayiyi_rakamla(mesaj_raw).replace("x","*")
+    mat_res = hesapla(mat_text)
+    if mat_res is not None:
+        kaydet_context(user_id, mesaj_raw, mat_res)
+        return mat_res
 
-    # Varsayılan yanıtlar
-    varsayilan_yanitlar = [
-        "Anlayamadım, biraz daha açıklar mısın?",
-        "Bunu nasıl cevaplayacağımı bilemedim.",
-        "Henüz bu konuda bilgim yok.",
-        "Başka bir şey sormak ister misin?",
-        "Bu konuda yardımcı olamayacağım."
-    ]
-    
-    return random.choice(varsayilan_yanitlar)
+    # Fallback
+    fallback = random.choice([
+        "Bunu anlamadım, tekrar sorabilir misin?",
+        "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)"
+    ])
+    kaydet_context(user_id, mesaj_raw, fallback)
+    return fallback
 
 # -----------------------------
-# Flask Routes
+# Web arayüzü
 # -----------------------------
-@app.route('/')
-def serve_index():
-    return send_from_directory(BASE_DIR, 'index.html')
+@app.route("/")
+def index():
+    if os.path.exists(INDEX_FILE):
+        return send_from_directory(os.path.dirname(INDEX_FILE), os.path.basename(INDEX_FILE))
+    return "<h3 style='position:absolute;top:10px;left:10px;'>MELDRA çalışıyor — chat endpoint: POST /chat</h3>"
 
-@app.route('/chat', methods=['POST'])
+@app.route("/chat", methods=["POST"])
 def chat():
-    user_id = request.json.get('user_id', 'default')
-    mesaj = request.json.get('mesaj', '').strip()
-    
-    if not mesaj:
-        return jsonify({"cevap": "Mesaj boş olamaz!"})
-    
+    data = request.get_json(force=True)
+    mesaj = data.get("mesaj","")
+    user_id = data.get("user_id","default")
     cevap = cevap_ver(mesaj, user_id)
-    kaydet_context(user_id, mesaj, cevap)
-    
     return jsonify({"cevap": cevap})
 
-@app.route('/context/<user_id>', methods=['GET'])
-def get_context(user_id):
-    return jsonify({"context": list(user_context.get(user_id, []))})
+@app.route("/_nlp_dump", methods=["GET"])
+def nlp_dump():
+    return jsonify(load_json(NLP_FILE))
 
-@app.route('/context/<user_id>', methods=['DELETE'])
-def clear_context(user_id):
-    if user_id in user_context:
-        user_context[user_id].clear()
-    return jsonify({"status": "Context temizlendi"})
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+# -----------------------------
+# Sunucu başlatma
+# -----------------------------
+if __name__=="__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
