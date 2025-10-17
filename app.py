@@ -84,7 +84,7 @@ def kelime_sayiyi_rakamla(metin):
 
 def hesapla(metin):
     try:
-        if re.fullmatch(r'[\d\.\+\-\*\/ ]+', metin):
+        if re.fullmatch(r'[\d\.\+\-\*\/\(\) ]+', metin):
             return str(eval(metin, {"__builtins__": None}, {}))
     except: return None
     return None
@@ -184,4 +184,103 @@ def wikihow_tarif(soru):
 # -----------------------------
 def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
-    mesaj_lc
+    mesaj_lc = mesaj_raw.lower()
+
+    # Kral modu
+    if mesaj_lc=="her biji amasya":
+        password_pending.add(user_id)
+        return "Parolayı giriniz:"
+    if user_id in password_pending:
+        if mesaj_lc=="0567995561":
+            password_pending.discard(user_id)
+            king_mode.add(user_id)
+            return "✅ Öğrenme modu aktif."
+        else:
+            password_pending.discard(user_id)
+            return "⛔ Yanlış parola."
+
+    if mesaj_lc in ["ben yüce kral melih çakar","ben yuce kral melih cakar"]:
+        king_mode.add(user_id)
+        return "👑 Öğrenme modu aktif!"
+
+    if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
+        try:
+            soru = mesaj_lc.split("soru:",1)[1].split("cevap:",1)[0].strip()
+            cevap = mesaj_lc.split("cevap:",1)[1].strip()
+            if soru and cevap:
+                nlp_data_local = load_json(NLP_FILE)
+                nlp_data_local.append({"triggers":[soru], "responses":[cevap]})
+                save_json(NLP_FILE, nlp_data_local)
+                global nlp_data
+                nlp_data = nlp_data_local
+                kaydet_context(user_id, soru, cevap)
+                return f"✅ '{soru}' sorusunu öğrendim."
+        except:
+            return "⚠️ Hatalı format."
+
+    if "öğret" in mesaj_lc: return "🤖 Sadece kral öğretebilir."
+
+    # Hava durumu
+    city = mesajdaki_sehir(mesaj_raw)
+    if city: return hava_durumu(city)
+
+    # WikiHow
+    wh_tarif = wikihow_tarif(mesaj_raw)
+    if wh_tarif:
+        kaydet_context(user_id, mesaj_raw, wh_tarif)
+        return wh_tarif
+
+    # Wikipedia
+    wiki_sonuc = wiki_ara(mesaj_raw)
+    if wiki_sonuc:
+        kaydet_context(user_id, mesaj_raw, wiki_sonuc)
+        return wiki_sonuc
+
+    # NLP
+    nlp_resp = nlp_cevap(mesaj_raw)
+    if nlp_resp:
+        kaydet_context(user_id, mesaj_raw, nlp_resp)
+        return nlp_resp
+
+    # Matematik
+    mat_text = kelime_sayiyi_rakamla(mesaj_raw).replace("x","*")
+    mat_res = hesapla(mat_text)
+    if mat_res is not None:
+        kaydet_context(user_id, mesaj_raw, mat_res)
+        return mat_res
+
+    # Fallback
+    fallback = random.choice([
+        "Bunu anlamadım, tekrar sorabilir misin?",
+        "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)"
+    ])
+    kaydet_context(user_id, mesaj_raw, fallback)
+    return fallback
+
+# -----------------------------
+# Web arayüzü
+# -----------------------------
+@app.route("/")
+def index():
+    if os.path.exists(INDEX_FILE):
+        return send_from_directory(os.path.dirname(INDEX_FILE), os.path.basename(INDEX_FILE))
+    return "<h3 style='position:absolute;top:10px;left:10px;'>MELDRA çalışıyor — chat endpoint: POST /chat</h3>"
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.get_json(force=True)
+    mesaj = data.get("mesaj","")
+    user_id = data.get("user_id","default")
+    cevap = cevap_ver(mesaj, user_id)
+    return jsonify({"cevap": cevap})
+
+@app.route("/_nlp_dump", methods=["GET"])
+def nlp_dump():
+    return jsonify(load_json(NLP_FILE))
+
+# -----------------------------
+# Sunucu başlatma
+# -----------------------------
+if __name__=="__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
