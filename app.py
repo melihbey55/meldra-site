@@ -3,6 +3,7 @@ import os, json, re, random, requests
 from difflib import SequenceMatcher
 from collections import deque
 from urllib.parse import quote
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
@@ -150,7 +151,7 @@ def wiki_ara(konu):
         return None
 
 # -----------------------------
-# Ekstra Web araştırma (DuckDuckGo API)
+# DuckDuckGo API
 # -----------------------------
 def web_ara(konu):
     try:
@@ -164,20 +165,38 @@ def web_ara(konu):
     return None
 
 # -----------------------------
-# Yemek tarifi özelliği
+# Yemek tarifi (TheMealDB + Nefis Yemek Tarifleri)
 # -----------------------------
 def yemek_tarifi(konu):
+    # 1️⃣ TheMealDB dene
     try:
-        # Örnek basit API: themealdb (ücretsiz)
         url = f"https://www.themealdb.com/api/json/v1/1/search.php?s={quote(konu)}"
         r = requests.get(url, timeout=8).json()
         meals = r.get("meals")
-        if not meals:
+        if meals:
+            meal = meals[0]
+            name = meal["strMeal"]
+            instructions = meal["strInstructions"]
+            return f"🍽️ {name} tarifi:\n{instructions[:600]}..."
+    except:
+        pass
+
+    # 2️⃣ Nefis Yemek Tarifleri — web scraping
+    try:
+        search_url = f"https://www.nefisyemektarifleri.com/?s={quote(konu)}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        html = requests.get(search_url, headers=headers, timeout=10).text
+        soup = BeautifulSoup(html, "html.parser")
+        link = soup.select_one("div.recipe-card a")
+        if not link:
             return None
-        meal = meals[0]
-        name = meal["strMeal"]
-        instructions = meal["strInstructions"]
-        return f"🍽️ {name} tarifi:\n{instructions[:600]}..."  # Uzun tarifin ilk kısmı
+        detay_url = link["href"]
+        detay_html = requests.get(detay_url, headers=headers, timeout=10).text
+        detay_soup = BeautifulSoup(detay_html, "html.parser")
+        baslik = detay_soup.select_one("h1.recipe-title").get_text(strip=True)
+        adimlar = detay_soup.select("div.recipe-preparation p")
+        text = " ".join([a.get_text(strip=True) for a in adimlar])[:600]
+        return f"🍳 {baslik} tarifi (Nefis Yemek Tarifleri):\n{text}..."
     except:
         return None
 
@@ -191,7 +210,7 @@ def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
     mesaj_lc = mesaj_raw.lower().strip()
 
-    # Kral modu (öğretme)
+    # 🏰 Kral modu
     if mesaj_lc=="her biji amasya":
         password_pending.add(user_id)
         return "Parolayı giriniz:"
@@ -203,11 +222,9 @@ def cevap_ver(mesaj, user_id="default"):
         else:
             password_pending.discard(user_id)
             return "⛔ Yanlış parola."
-
     if mesaj_lc in ["ben yüce kral melih çakar","ben yuce kral melih cakar"]:
         king_mode.add(user_id)
         return "👑 Öğrenme modu aktif!"
-
     if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
         try:
             soru = mesaj_lc.split("soru:",1)[1].split("cevap:",1)[0].strip()
