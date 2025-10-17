@@ -3,11 +3,12 @@ import os, json, re, random, requests
 from difflib import SequenceMatcher
 from collections import deque
 from urllib.parse import quote
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
 # -----------------------------
-# Dosya yolları
+# Dosya yolları ve ayarlar
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NLP_FILE = os.path.join(BASE_DIR, "nlp_data.json")
@@ -142,7 +143,7 @@ def mesajdaki_sehir(mesaj):
 # -----------------------------
 def wiki_ara(konu):
     try:
-        headers = {"User-Agent": "MeldraBot/1.0 (https://example.com)"}
+        headers = {"User-Agent": "MeldraBot/1.0"}
         search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
         res = requests.get(search_url, headers=headers, timeout=10).json()
         search_results = res.get("query", {}).get("search", [])
@@ -159,17 +160,21 @@ def wiki_ara(konu):
 # -----------------------------
 # WikiHow tarifleri
 # -----------------------------
-def wikihow_tarif(konu):
+def wikihow_tarif(soru):
     try:
-        headers = {"User-Agent": "MeldraBot/1.0 (https://example.com)"}
-        search_url = f"https://www.wikihow.com/api.php?action=search&query={quote(konu)}&format=json"
-        res = requests.get(search_url, headers=headers, timeout=10).json()
-        if "results" in res and res["results"]:
-            # İlk sonucu al
-            first = res["results"][0]
-            title = first.get("title")
-            url = "https://www.wikihow.com/" + first.get("url", "").replace(" ","-")
-            return f"Tarif: {title}\nURL: {url}"
+        search_url = f"https://www.wikihow.com/wikiHowTo?search={quote(soru)}"
+        headers = {"User-Agent": "MeldraBot/1.0"}
+        res = requests.get(search_url, headers=headers, timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
+        first_link = soup.select_one("a.result_link")
+        if first_link:
+            link = "https://www.wikihow.com" + first_link["href"]
+            page_res = requests.get(link, headers=headers, timeout=10)
+            page_soup = BeautifulSoup(page_res.text, "html.parser")
+            steps = page_soup.select("div.step p, div.step")
+            text = "\n".join([s.get_text(strip=True) for s in steps if s.get_text(strip=True)])
+            if text.strip():
+                return text
     except:
         return None
     return None
@@ -179,13 +184,4 @@ def wikihow_tarif(konu):
 # -----------------------------
 def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
-    mesaj_lc = mesaj_raw.lower().strip()
-
-    # Kral modu
-    if mesaj_lc=="her biji amasya":
-        password_pending.add(user_id)
-        return "Parolayı giriniz:"
-    if user_id in password_pending:
-        if mesaj_lc=="0567995561":
-            password_pending.discard(user_id)
-            king_mode
+    mesaj_lc
