@@ -7,7 +7,7 @@ from urllib.parse import quote
 app = Flask(__name__)
 
 # -----------------------------
-# Dosya yolları
+# Dosya yolları ve global değişkenler
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NLP_FILE = os.path.join(BASE_DIR, "nlp_data.json")
@@ -17,7 +17,7 @@ user_context = {}
 king_mode = set()
 password_pending = set()
 
-# OpenWeatherMap API Key
+# API Key (OpenWeatherMap)
 WEATHER_API_KEY = "6a7a443921825622e552d0cde2d2b688"
 
 # Türk şehirleri
@@ -31,7 +31,7 @@ TURKISH_CITIES = [
     "tokat","trabzon","tunceli","usak","van","yalova","yozgat","zonguldak"
 ]
 
-# JSON dosyası yoksa oluştur
+# NLP JSON dosyası yoksa oluştur
 if not os.path.exists(NLP_FILE):
     with open(NLP_FILE, "w", encoding="utf-8") as f:
         json.dump([], f, ensure_ascii=False, indent=2)
@@ -138,22 +138,42 @@ def mesajdaki_sehir(mesaj):
     return None
 
 # -----------------------------
-# Wikipedia araştırma
+# Wikipedia
 # -----------------------------
 def wiki_ara(konu):
     try:
-        headers = {"User-Agent": "MeldraBot/1.0"}
+        headers = {"User-Agent": "MeldraBot/1.0 (https://example.com)"}
         search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
         res = requests.get(search_url, headers=headers, timeout=10).json()
-        results = res.get("query", {}).get("search", [])
-        if not results:
-            return None
-        title = results[0]["title"]
-        summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
-        summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
-        extract = summary_res.get("extract")
-        if extract:
-            return extract
+        search_results = res.get("query", {}).get("search", [])
+        if search_results:
+            title = search_results[0]["title"]
+            summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
+            summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
+            if "extract" in summary_res:
+                return summary_res["extract"]
+    except:
+        return None
+    return None
+
+# -----------------------------
+# WikiHow Yemek Tarifi
+# -----------------------------
+def wikihow_tarif(konu):
+    try:
+        headers = {"User-Agent": "MeldraBot/1.0 (https://example.com)"}
+        search_url = f"https://www.wikihow.com/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
+        res = requests.get(search_url, headers=headers, timeout=10).json()
+        search_results = res.get("query", {}).get("search", [])
+        if search_results:
+            pageid = search_results[0]["pageid"]
+            detail_url = f"https://www.wikihow.com/api.php?action=parse&pageid={pageid}&format=json"
+            detail_res = requests.get(detail_url, headers=headers, timeout=10).json()
+            if "parse" in detail_res and "text" in detail_res["parse"]:
+                text = detail_res["parse"]["text"]["*"]
+                # HTML etiketlerini temizle
+                text = re.sub(r'<.*?>', '', text)
+                return text.strip()[:1000] + "..."  # İlk 1000 karakter göster
     except:
         return None
     return None
@@ -171,61 +191,4 @@ def cevap_ver(mesaj, user_id="default"):
         return "Parolayı giriniz:"
     if user_id in password_pending:
         if mesaj_lc=="0567995561":
-            password_pending.discard(user_id)
-            king_mode.add(user_id)
-            return "✅ Öğrenme modu aktif."
-        else:
-            password_pending.discard(user_id)
-            return "⛔ Yanlış parola."
-
-    if mesaj_lc in ["ben yüce kral melih çakar","ben yuce kral melih cakar"]:
-        king_mode.add(user_id)
-        return "👑 Öğrenme modu aktif!"
-
-    if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
-try:
-        soru = mesaj_lc.split("soru:",1)[1].split("cevap:",1)[0].strip()
-        cevap = mesaj_lc.split("cevap:",1)[1].strip()
-        if soru and cevap:
-            nlp_data_local = load_json(NLP_FILE)
-            nlp_data_local.append({"triggers":[soru], "responses":[cevap]})
-            save_json(NLP_FILE, nlp_data_local)
-            global nlp_data
-            nlp_data = nlp_data_local
-            kaydet_context(user_id, soru, cevap)
-            return f"✅ '{soru}' sorusunu öğrendim."
-    except:
-        return "⚠️ Hatalı format."
-
-if "öğret" in mesaj_lc: return "🤖 Sadece kral öğretebilir."
-
-# NLP
-nlp_resp = nlp_cevap(mesaj_raw)
-if nlp_resp:
-    kaydet_context(user_id, mesaj_raw, nlp_resp)
-    return nlp_resp
-
-# Matematik
-mat_text = kelime_sayiyi_rakamla(mesaj_raw).replace("x","*")
-mat_res = hesapla(mat_text)
-if mat_res is not None:
-    kaydet_context(user_id, mesaj_raw, mat_res)
-    return mat_res
-
-# Hava durumu
-city = mesajdaki_sehir(mesaj_raw)
-if city: return hava_durumu(city)
-
-# Wikipedia (yalnızca diğerleri çalışmazsa)
-wiki_sonuc = wiki_ara(mesaj_raw)
-if wiki_sonuc:
-    kaydet_context(user_id, mesaj_raw, wiki_sonuc)
-    return wiki_sonuc
-
-# Fallback
-fallback = random.choice([
-    "Bunu anlamadım, tekrar sorabilir misin?",
-    "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)"
-])
-kaydet_context(user_id, mesaj_raw, fallback)
-return fallback
+            password_pending.dis
