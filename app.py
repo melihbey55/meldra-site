@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 
 # -----------------------------
-# Dosya yolları ve ayarlar
+# Dosya yolları
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NLP_FILE = os.path.join(BASE_DIR, "nlp_data.json")
@@ -20,18 +20,16 @@ password_pending = set()
 
 WEATHER_API_KEY = "6a7a443921825622e552d0cde2d2b688"
 
-# Türkiye'deki tüm şehirler
+# Türkiye’deki tüm iller
 TURKISH_CITIES = [
-    "adana","adiyaman","afyonkarahisar","agri","aksaray","amasya","ankara","antalya",
-    "ardahan","artvin","aydin","balikesir","bartin"," Batman","bayburt","bilecik",
-    "bingol","bitlis","bolu","burdur","bursa","canakkale","cankiri","corum","denizli",
-    "diyarbakir","duzce","edirne","elazig","erzincan","erzurum","eskisehir","gaziantep",
-    "giresun","gumushane","hakkari","hatay","igdir","isparta","istanbul","izmir","kahramanmaras",
-    "karabuk","karaman","kars","kastamonu","kayseri","kirikkale","kirklareli","kirsehir",
-    "kilis","kocaeli","konya","kutahya","malatya","manisa","mardin","mersin","mugla",
-    "mus","nevsehir","nigde","ordu","osmaniye","rize","sakarya","samsun","sanliurfa",
-    "siirt","sinop","sivas","sirnak","tekirdag","tokat","trabzon","tunceli","usak",
-    "van","yalova","yozgat","zonguldak"
+    "adana","adiyaman","afyonkarahisar","agri","aksaray","amasya","ankara","antalya","ardahan",
+    "artvin","aydin","balikesir","bartin","batman","bayburt","bilecik","bingol","bitlis","bolu",
+    "burdur","bursa","canakkale","cankiri","corum","denizli","diyarbakir","edirne","elazig","erzincan",
+    "erzurum","eskisehir","gaziantep","giresun","gumushane","hakkari","hatay","igdir","isparta","istanbul",
+    "izmir","kahramanmaras","karabuk","karaman","kars","kastamonu","kayseri","kilis","kirikkale","kirklareli",
+    "kirsehir","kocaeli","konya","kutahya","malatya","manisa","mardin","mersin","mugla","mus","nevsehir",
+    "nigde","ordu","osmaniye","rize","sakarya","samsun","siirt","sinop","sivas","sanliurfa","sirnak",
+    "tekirdag","tokat","trabzon","tunceli","usak","van","yalova","yozgat","zonguldak"
 ]
 
 # JSON dosyası yoksa oluştur
@@ -137,15 +135,48 @@ def hava_durumu(sehir):
 def mesajdaki_sehir(mesaj):
     mesaj_norm = re.sub(r'[^\w\s]','', mesaj.lower())
     for city in TURKISH_CITIES:
-        if city in mesaj_norm: return city
+        # Şehir adına -da/-de/-ta/-te ekleri gelebilir
+        if re.search(r'\b'+re.escape(city)+r'(da|de|ta|te)?\b', mesaj_norm):
+            return city
     return None
 
 # -----------------------------
-# Yemek tarifi
+# Wikipedia araştırma
+# -----------------------------
+def wiki_ara(konu):
+    try:
+        headers = {"User-Agent": "MeldraBot/1.0"}
+        search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
+        res = requests.get(search_url, headers=headers, timeout=10).json()
+        results = res.get("query", {}).get("search", [])
+        if not results:
+            return None
+        title = results[0]["title"]
+        summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
+        summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
+        return summary_res.get("extract")
+    except:
+        return None
+
+# -----------------------------
+# DuckDuckGo API
+# -----------------------------
+def web_ara(konu):
+    try:
+        url = f"https://api.duckduckgo.com/?q={quote(konu)}&format=json&lang=tr"
+        r = requests.get(url, timeout=8).json()
+        text = r.get("AbstractText") or r.get("Heading")
+        if text:
+            return text
+    except:
+        return None
+    return None
+
+# -----------------------------
+# Yemek tarifi (TheMealDB + Nefis Yemek Tarifleri)
 # -----------------------------
 def yemek_tarifi(konu):
-    tarif = None
-    # TheMealDB
+    # 1️⃣ TheMealDB dene
     try:
         url = f"https://www.themealdb.com/api/json/v1/1/search.php?s={quote(konu)}"
         r = requests.get(url, timeout=8).json()
@@ -154,36 +185,34 @@ def yemek_tarifi(konu):
             meal = meals[0]
             name = meal["strMeal"]
             instructions = meal["strInstructions"]
-            tarif = f"🍽️ {name} tarifi:\n{instructions[:600]}..."
-    except: pass
+            return f"🍽️ {name} tarifi:\n{instructions[:600]}..."
+    except:
+        pass
 
-    # Nefis Yemek Tarifleri
-    if not tarif:
-        try:
-            search_url = f"https://www.nefisyemektarifleri.com/?s={quote(konu)}"
-            headers = {"User-Agent": "Mozilla/5.0"}
-            html = requests.get(search_url, headers=headers, timeout=10).text
-            soup = BeautifulSoup(html, "html.parser")
-            link = soup.select_one("div.recipe-card a")
-            if link:
-                detay_url = link["href"]
-                detay_html = requests.get(detay_url, headers=headers, timeout=10).text
-                detay_soup = BeautifulSoup(detay_html, "html.parser")
-                baslik_tag = detay_soup.select_one("h1.recipe-title")
-                if baslik_tag:
-                    baslik = baslik_tag.get_text(strip=True)
-                    adimlar = detay_soup.select("div.recipe-preparation p")
-                    text = " ".join([a.get_text(strip=True) for a in adimlar])[:600]
-                    tarif = f"🍳 {baslik} tarifi (Nefis Yemek Tarifleri):\n{text}..."
-        except: pass
-
-    if not tarif:
-        tarif = f"'{konu}' için tarif bulunamadı, basit olarak malzemeleri haşlayıp sos ile servis edebilirsiniz."
-
-    return tarif
+    # 2️⃣ Nefis Yemek Tarifleri — web scraping
+    try:
+        search_url = f"https://www.nefisyemektarifleri.com/?s={quote(konu)}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        html = requests.get(search_url, headers=headers, timeout=10).text
+        soup = BeautifulSoup(html, "html.parser")
+        link = soup.select_one("div.recipe-card a")
+        if not link:
+            return None
+        detay_url = link["href"]
+        detay_html = requests.get(detay_url, headers=headers, timeout=10).text
+        detay_soup = BeautifulSoup(detay_html, "html.parser")
+        baslik_tag = detay_soup.select_one("h1.recipe-title")
+        if not baslik_tag:
+            return None
+        baslik = baslik_tag.get_text(strip=True)
+        adimlar = detay_soup.select("div.recipe-preparation p")
+        text = " ".join([a.get_text(strip=True) for a in adimlar])[:600]
+        return f"🍳 {baslik} tarifi (Nefis Yemek Tarifleri):\n{text}..."
+    except:
+        return None
 
 def tarif_var_mi(mesaj):
-    return any(x in mesaj.lower() for x in ["tarifi","nasıl yapılır","yapımı","tarif"])
+    return any(x in mesaj.lower() for x in ["tarifi","nasıl yapılır","yapımı","tarif","ver"])
 
 # -----------------------------
 # Cevap motoru
@@ -191,6 +220,39 @@ def tarif_var_mi(mesaj):
 def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
     mesaj_lc = mesaj_raw.lower().strip()
+
+    # 🏰 Kral modu
+    if mesaj_lc=="her biji amasya":
+        password_pending.add(user_id)
+        return "Parolayı giriniz:"
+    if user_id in password_pending:
+        if mesaj_lc=="0567995561":
+            password_pending.discard(user_id)
+            king_mode.add(user_id)
+            return "✅ Öğrenme modu aktif."
+        else:
+            password_pending.discard(user_id)
+            return "⛔ Yanlış parola."
+    if mesaj_lc in ["ben yüce kral melih çakar","ben yuce kral melih cakar"]:
+        king_mode.add(user_id)
+        return "👑 Öğrenme modu aktif!"
+    if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
+        try:
+            soru = mesaj_lc.split("soru:",1)[1].split("cevap:",1)[0].strip()
+            cevap = mesaj_lc.split("cevap:",1)[1].strip()
+            if soru and cevap:
+                nlp_data_local = load_json(NLP_FILE)
+                nlp_data_local.append({"triggers":[soru], "responses":[cevap]})
+                save_json(NLP_FILE, nlp_data_local)
+                global nlp_data
+                nlp_data = nlp_data_local
+                kaydet_context(user_id, soru, cevap)
+                return f"✅ '{soru}' sorusunu öğrendim."
+        except:
+            return "⚠️ Hatalı format."
+
+    if "öğret" in mesaj_lc: 
+        return "🤖 Sadece kral öğretebilir."
 
     # NLP
     nlp_resp = nlp_cevap(mesaj_raw)
@@ -212,13 +274,30 @@ def cevap_ver(mesaj, user_id="default"):
 
     # Yemek tarifi
     if tarif_var_mi(mesaj_raw):
-        konu = re.sub(r'(tarifi|nasıl yapılır|yapımı|tarif)', '', mesaj_raw, flags=re.IGNORECASE).strip()
-        return yemek_tarifi(konu)
+        konu = re.sub(r'\b(tarifi|nasıl yapılır|yapımı|tarif|ver)\b', '', mesaj_raw, flags=re.IGNORECASE).strip()
+        if not konu:
+            konu = "yemek"
+        tarif = yemek_tarifi(konu)
+        if tarif:
+            return tarif
+        else:
+            return f"'{konu}' için tarif bulunamadı."
 
-    # Fallback
+    # Wikipedia
+    wiki_sonuc = wiki_ara(mesaj_raw)
+    if wiki_sonuc:
+        kaydet_context(user_id, mesaj_raw, wiki_sonuc)
+        return wiki_sonuc
+
+    # Web araması (fallback)
+    web_sonuc = web_ara(mesaj_raw)
+    if web_sonuc:
+        kaydet_context(user_id, mesaj_raw, web_sonuc)
+        return web_sonuc
+
     fallback = random.choice([
         "Bunu anlamadım, tekrar sorabilir misin?",
-        "Henüz bunu bilmiyorum, kral modu ile öğretebilirsin."
+        "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)"
     ])
     kaydet_context(user_id, mesaj_raw, fallback)
     return fallback
