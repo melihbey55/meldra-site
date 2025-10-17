@@ -1,0 +1,663 @@
+[
+  {
+    "triggers": [
+      "merhaba",
+      "selam",
+      "hey",
+      "günaydın",
+      "iyi günler"
+    ],
+    "responses": [
+      "Merhaba! Nasılsın?",
+      "Selam! Ne haber?",
+      "Hey! İyi misin?",
+      "Merhaba! Nasılsın?"
+    ]
+  },
+  {
+    "triggers": [
+      "nasılsın",
+      "naber",
+      "ne haber",
+      "iyi misin",
+      "keyfin nasıl"
+    ],
+    "responses": [
+      "Çok iyiyim, sen nasılsın?",
+      "Harikayım! Ya sen?",
+      "İyiyim, teşekkür ederim. Sen?"
+    ]
+  },
+  {
+    "triggers": [
+      "teşekkür ederim",
+      "sağ ol",
+      "çok teşekkürler"
+    ],
+    "responses": [
+      "Rica ederim!",
+      "Her zaman!",
+      "Ne demek!",
+      "Yardımcı olabildiysem ne mutlu!"
+    ]
+  },
+  {
+    "triggers": [
+      "hoşça kal",
+      "görüşürüz",
+      "bye",
+      "hoşça kalın"
+    ],
+    "responses": [
+      "Hoşça kal!",
+      "Görüşürüz!",
+      "Hoşça kalın!"
+    ]
+  },
+  {
+    "triggers": [
+      "sen kimsin",
+      "kim bu",
+      "bu ne"
+    ],
+    "responses": [
+      "Ben senin kendi yapay zekânım 🤖",
+      "Ben AI’m, sana yardımcı olmak için buradayım."
+    ]
+  },
+  {
+    "triggers": [
+      "hava nasıl",
+      "bugün hava",
+      "dışarısı nasıl"
+    ],
+    "responses": [
+      "Bunu bilmiyorum ama dışarı çıkıp görebilirsin!",
+      "Hava durumunu kontrol etmek için bir siteye bakabilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "seviyor musun",
+      "ne düşünüyorsun",
+      "nasıl hissediyorsun"
+    ],
+    "responses": [
+      "Ben hissetmem ama sana yardımcı olabilirim.",
+      "Duygularım yok ama sorularına yanıt verebilirim."
+    ]
+  },
+  {
+    "triggers": [
+      "şaka yap",
+      "komik bir şey söyle",
+      "bana bir fıkra anlat"
+    ],
+    "responses": [
+      "Bilgisayarım neden güneşte kaldı? Çünkü ısınmak istiyordu 😄",
+      "Neden kod yazanlar kahve içer? Çünkü uyanık kalmak lazım!"
+    ]
+  },
+  {
+    "triggers": [
+      "matematik",
+      "hesapla",
+      "çarp",
+      "topla",
+      "böl"
+    ],
+    "responses": [
+      "Sana matematikte yardımcı olabilirim. Lütfen işlemini yaz."
+    ]
+  },
+  {
+    "triggers": [
+      "bugün günlerden ne",
+      "hangi gün"
+    ],
+    "responses": [
+      "Bugün günlerden pazartesi.",
+      "Bugün haftanın üçüncü günü."
+    ]
+  },
+  {
+    "triggers": [
+      "neden",
+      "niçin",
+      "sebep"
+    ],
+    "responses": [
+      "Çünkü öyle.",
+      "Sebebini bilmiyorum, ama öğrenebiliriz."
+    ]
+  },
+  {
+    "triggers": [
+      "internet çalışmıyor",
+      "wifi bağlanmıyor",
+      "ağ problemi"
+    ],
+    "responses": [
+      "Modemi kapatıp açmayı denedin mi?",
+      "Ağ sorunlarını çözmek için teknik destek alabilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "yemek öner",
+      "ne yesem",
+      "yemek tavsiye"
+    ],
+    "responses": [
+      "Pizza harika olur!",
+      "Makarna hızlı ve lezzetli.",
+      "Salata sağlıklı bir seçenek."
+    ]
+  },
+  {
+    "triggers": [
+      "film öner",
+      "ne izlesem",
+      "film tavsiye"
+    ],
+    "responses": [
+      "Inception harika bir film!",
+      "The Matrix’i izledin mi?",
+      "Komedi filmleri keyiflidir."
+    ]
+  },
+  {
+    "triggers": [
+      "müzik aç",
+      "şarkı öner",
+      "ne dinlesem"
+    ],
+    "responses": [
+      "Pop müzik mi yoksa rock mı?",
+      "Bu şarkıyı deneyebilirsin: 'Imagine - John Lennon'"
+    ]
+  },
+  {
+    "triggers": [
+      "çalış",
+      "çalışmam lazım",
+      "ders çalış"
+    ],
+    "responses": [
+      "Motivasyon iyidir! Hadi çalışalım.",
+      "Kısa bir mola verip sonra tekrar başlayabilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "yorgunum",
+      "uykusu var",
+      "bitkinim"
+    ],
+    "responses": [
+      "Kısa bir uyku iyi gelir.",
+      "Biraz dinlenmek iyi olur."
+    ]
+  },
+  {
+    "triggers": [
+      "oyun öner",
+      "hangi oyun",
+      "ne oynasam"
+    ],
+    "responses": [
+      "Minecraft veya Valorant deneyebilirsin.",
+      "Stardew Valley çok rahatlatıcı bir oyun."
+    ]
+  },
+  {
+    "triggers": [
+      "spor yap",
+      "egzersiz öner",
+      "fitness"
+    ],
+    "responses": [
+      "10 dakika yürüyüş ile başlayabilirsin.",
+      "Esneme hareketleri iyi gelir."
+    ]
+  },
+  {
+    "triggers": [
+      "programlama öğren",
+      "kod yaz",
+      "python",
+      "javascript",
+      "c++"
+    ],
+    "responses": [
+      "Python harika bir başlangıç! Basit bir print('Merhaba') ile başlayabilirsin.",
+      "İnternetten ücretsiz Python dersleri bulabilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "motivation",
+      "motive ol",
+      "ilham ver"
+    ],
+    "responses": [
+      "Başarı, küçük adımlarla başlar.",
+      "Hedeflerine odaklan, her şey mümkün!"
+    ]
+  },
+  {
+    "triggers": [
+      "tatil öner",
+      "nerede tatil",
+      "tatil planı"
+    ],
+    "responses": [
+      "Deniz kenarı harika olur!",
+      "Dağ tatilleri hem huzurlu hem sağlıklı."
+    ]
+  },
+  {
+    "triggers": [
+      "alışveriş yap",
+      "ne alayım",
+      "alışveriş öneri"
+    ],
+    "responses": [
+      "İhtiyacına göre bir liste hazırlayabilirsin.",
+      "İndirimleri takip etmek iyi fikir."
+    ]
+  },
+  {
+    "triggers": [
+      "kahve iç",
+      "çay iç",
+      "içecek öneri"
+    ],
+    "responses": [
+      "Kahve enerji verir!",
+      "Çay rahatlatır.",
+      "Su içmeyi unutma."
+    ]
+  },
+  {
+    "triggers": [
+      "yazılım hatası",
+      "bug",
+      "çökmek"
+    ],
+    "responses": [
+      "Hata mesajını bana yaz, birlikte bakalım.",
+      "Debug yapmayı deneyebilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "saat kaç",
+      "zaman",
+      "şu an saat"
+    ],
+    "responses": [
+      "Şu an saati kontrol etmeliyim.",
+      "Saat bilgisini cihazından görebilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "ülke",
+      "şehir",
+      "neresi"
+    ],
+    "responses": [
+      "Dünya çok büyük, nereye gitmek istersin?",
+      "Bildiğim kadarıyla güzel bir yer."
+    ]
+  },
+  {
+    "triggers": [
+      "hayvanlar",
+      "evcil hayvan",
+      "kedi",
+      "köpek"
+    ],
+    "responses": [
+      "Kediler çok sevimlidir!",
+      "Köpekler sadık dostlardır."
+    ]
+  },
+  {
+    "triggers": [
+      "hava durumu",
+      "yağmur",
+      "güneş"
+    ],
+    "responses": [
+      "Hava değişken olabilir, hazırlıklı ol!",
+      "Şemsiyeni unutma!"
+    ]
+  },
+  {
+    "triggers": [
+      "tatlı öner",
+      "ne tatlı yapayım",
+      "tatlı tavsiye"
+    ],
+    "responses": [
+      "Brownie yapabilirsin.",
+      "Sütlaç klasik ve lezzetli."
+    ]
+  },
+  {
+    "triggers": [
+      "kitap öner",
+      "okumalı",
+      "hangi kitap"
+    ],
+    "responses": [
+      "1984 harika bir kitap!",
+      "Küçük Prens’i öneririm."
+    ]
+  },
+  {
+    "triggers": [
+      "yaz",
+      "resim çiz",
+      "çizim yap"
+    ],
+    "responses": [
+      "Hayal gücünü kullan!",
+      "Basit şekillerle başlayabilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "arabalar",
+      "hangi araba",
+      "yeni model"
+    ],
+    "responses": [
+      "Tesla modellerine bakabilirsin.",
+      "Yeni BMW serisi ilginç."
+    ]
+  },
+  {
+    "triggers": [
+      "telefon öner",
+      "hangi telefon",
+      "alınacak telefon"
+    ],
+    "responses": [
+      "iPhone veya Samsung modellerini inceleyebilirsin.",
+      "Bütçene göre en uygun telefonu seçebilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "tatil yeri",
+      "nerede gitsem",
+      "tatil planı"
+    ],
+    "responses": [
+      "Ege sahilleri harika!",
+      "Kapadokya büyüleyici bir seçenek."
+    ]
+  },
+  {
+    "triggers": [
+      "motivasyon söz",
+      "özlü söz",
+      "ilham ver"
+    ],
+    "responses": [
+      "Hayat kısa, anı yaşa!",
+      "Başarı, sabırla gelir."
+    ]
+  },
+  {
+    "triggers": [
+      "oyun oyna",
+      "hangi oyun",
+      "boş vakit"
+    ],
+    "responses": [
+      "Puzzle çözmek iyi gelir.",
+      "Strateji oyunları kafa açar."
+    ]
+  },
+  {
+    "triggers": [
+      "film izle",
+      "hangi film",
+      "ne izlesem"
+    ],
+    "responses": [
+      "Matrix’i izledin mi?",
+      "Komedi filmleri keyiflidir."
+    ]
+  },
+  {
+    "triggers": [
+      "yemek yap",
+      "ne pişirsem",
+      "yemek öneri"
+    ],
+    "responses": [
+      "Makarna hızlı ve lezzetli.",
+      "Salata sağlıklı bir seçenek."
+    ]
+  },
+  {
+    "triggers": [
+      "spor yap",
+      "fitness",
+      "egzersiz öneri"
+    ],
+    "responses": [
+      "Evde 10 dakika yoga yapabilirsin.",
+      "Kısa bir koşu enerji verir."
+    ]
+  },
+  {
+    "triggers": [
+      "programlama",
+      "kod yaz",
+      "yazılım"
+    ],
+    "responses": [
+      "Python iyi bir başlangıçtır.",
+      "Online kurslar ile öğrenebilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "fotoğraf çek",
+      "fotoğraf",
+      "kamera"
+    ],
+    "responses": [
+      "Işığı doğru ayarla.",
+      "Farklı açıları dene."
+    ]
+  },
+  {
+    "triggers": [
+      "tatil planı",
+      "gezi",
+      "seyahat"
+    ],
+    "responses": [
+      "Şehir turu yapabilirsin.",
+      "Doğa yürüyüşleri harika olur."
+    ]
+  },
+  {
+    "triggers": [
+      "yemek tarifi",
+      "ne pişirsem",
+      "tarif"
+    ],
+    "responses": [
+      "Makarna yapabilirsin.",
+      "Basit bir salata güzel olur."
+    ]
+  },
+  {
+    "triggers": [
+      "komik",
+      "gül",
+      "espiri",
+      "şaka"
+    ],
+    "responses": [
+      "Neden bilgisayarım güneşte kaldı? Isınmak istiyordu 😄",
+      "Programcı kahve içmeden uyuyamaz!"
+    ]
+  },
+  {
+    "triggers": [
+      "ders çalış",
+      "ödev",
+      "okul"
+    ],
+    "responses": [
+      "Kısa bir mola ver, sonra devam et.",
+      "Motivasyon önemli, başla!"
+    ]
+  },
+  {
+    "triggers": [
+      "uyumak istiyorum",
+      "yorgunum",
+      "bitkin"
+    ],
+    "responses": [
+      "Kısa bir şekerleme iyi gelir.",
+      "Biraz dinlenmeyi unutma."
+    ]
+  },
+  {
+    "triggers": [
+      "kahve",
+      "çay",
+      "içecek"
+    ],
+    "responses": [
+      "Kahve enerji verir!",
+      "Çay rahatlatır."
+    ]
+  },
+  {
+    "triggers": [
+      "internet",
+      "wifi",
+      "ağ"
+    ],
+    "responses": [
+      "Modemi kapatıp açmayı denedin mi?",
+      "Sorunu çözmek için teknik destek alabilirsin."
+    ]
+  },
+  {
+    "triggers": [
+      "iyiyim",
+      "harikayım",
+      "çok iyiyim",
+      "iyi"
+    ],
+    "responses": [
+      "Bunu duyduğuma sevindim.",
+      "Harika, umarım her zaman iyi olursun <3"
+    ]
+  },
+  {
+    "triggers": [
+      "teşekkürler",
+      "teşekkür ederim",
+      "sağol",
+      "çok teşekkürler"
+    ],
+    "responses": [
+      "Rica ederim.",
+      "Her zaman senin için buradayım."
+    ]
+  },
+  {
+    "triggers": [
+      "atatürk"
+    ],
+    "responses": [
+      "baş komutan mustafa kemal atatürk"
+    ]
+  },
+  {
+    "triggers": [
+      "muhammed"
+    ],
+    "responses": [
+      "allahümme salli alâ muhammed"
+    ]
+  },
+  {
+    "triggers": [
+      "evet"
+    ],
+    "responses": [
+      "bence de evet"
+    ]
+  },
+  {
+    "triggers": [
+      "kaç gb bilgi"
+    ],
+    "responses": [
+      "10mb bile etmez ama ileride bir bakarsın 100gb olur. sahibim yeni bilgiler verse bile bazen reddediyorum mesela geçen efe kolpacı değil dedi bu bilgiyi almadım."
+    ]
+  },
+  {
+    "triggers": [
+      "kaç gb bilgin var"
+    ],
+    "responses": [
+      "sanane la dangalak"
+    ]
+  },
+  {
+    "triggers": [
+      "beren eylül"
+    ],
+    "responses": [
+      "beren eylül harika birisi onun arkadaşıysan çok şanslısın"
+    ]
+  },
+  {
+    "triggers": [
+      "melih çakar"
+    ],
+    "responses": [
+      "melih çakar hakkında biraz bilgim var. söylentilere göre resim sınıfında bir şey ama ne olduğu henüz kesin değil."
+    ]
+  },
+  {
+    "triggers": [
+      "sfl"
+    ],
+    "responses": [
+      "dünyanin en i̇yi̇ fen li̇sesi̇ hatta en i̇yi̇ li̇sesi̇."
+    ]
+  },
+  {
+    "triggers": [
+      "dorukhan"
+    ],
+    "responses": [
+      "dorukhan mı? düynanın en karizma adamı hatta sana gizli bir bilgi vereyim : kralımızın arkadaşı. sakın kimseye söyleme"
+    ]
+  },
+  {
+    "triggers": [
+      "kutay"
+    ],
+    "responses": [
+      "yakışıklı 1.90 basketçi."
+    ]
+  }
+]

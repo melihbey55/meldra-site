@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MELDRA Chat</title>
+<style>
+    * {margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif;}
+    body, html {height:100%;width:100%;background:#0a0f2c;color:#fff;}
+    header {height:60px;background:#001f5c;display:flex;align-items:center;padding:0 20px;font-size:24px;font-weight:bold;box-shadow:0 2px 5px rgba(0,0,0,0.3);}
+    #chat-container {display:flex;flex-direction:column;height:calc(100% - 60px);padding:10px;overflow-y:auto;}
+    .message {max-width:70%;margin:5px 0;padding:10px 15px;border-radius:15px;word-wrap:break-word;}
+    .user {align-self:flex-end;background:#1e90ff;color:#fff;border-bottom-right-radius:0;}
+    .bot {align-self:flex-start;background:#11182b;color:#fff;border-bottom-left-radius:0;}
+    #input-area {position:fixed;bottom:0;left:0;width:100%;display:flex;padding:10px;background:#001f5c;}
+    #msg {flex:1;padding:10px;border-radius:10px;border:none;font-size:16px;}
+    #send-btn {padding:10px 20px;margin-left:10px;background:#1e90ff;border:none;color:#fff;border-radius:10px;font-size:16px;cursor:pointer;}
+    #send-btn:hover {background:#4da6ff;}
+</style>
+</head>
+<body>
+<header>MELDRA</header>
+<div id="chat-container"></div>
+<div id="input-area">
+    <input type="text" id="msg" placeholder="Mesajınızı yazın...">
+    <button id="send-btn">Gönder</button>
+</div>
+
+<script>
+const chatContainer = document.getElementById('chat-container');
+const msgInput = document.getElementById('msg');
+const sendBtn = document.getElementById('send-btn');
+
+function appendMessage(text, sender){
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('message', sender);
+    msgDiv.textContent = text;
+    chatContainer.appendChild(msgDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+async function sendMessage(){
+    const text = msgInput.value.trim();
+    if(!text) return;
+    appendMessage(text, 'user');
+    msgInput.value = '';
+    
+    try{
+        const res = await fetch('/chat', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({mesaj:text, user_id:'default'})
+        });
+        const data = await res.json();
+        appendMessage(data.cevap, 'bot');
+    }catch(e){
+        appendMessage("⚠️ Bot ile iletişim kurulamadı.", 'bot');
+    }
+}
+
+sendBtn.addEventListener('click', sendMessage);
+msgInput.addEventListener('keypress', e=>{if(e.key==='Enter') sendMessage();});
+</script>
+</body>
+</html>
