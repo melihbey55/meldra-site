@@ -183,3 +183,49 @@ def cevap_ver(mesaj, user_id="default"):
         return "👑 Öğrenme modu aktif!"
 
     if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
+try:
+        soru = mesaj_lc.split("soru:",1)[1].split("cevap:",1)[0].strip()
+        cevap = mesaj_lc.split("cevap:",1)[1].strip()
+        if soru and cevap:
+            nlp_data_local = load_json(NLP_FILE)
+            nlp_data_local.append({"triggers":[soru], "responses":[cevap]})
+            save_json(NLP_FILE, nlp_data_local)
+            global nlp_data
+            nlp_data = nlp_data_local
+            kaydet_context(user_id, soru, cevap)
+            return f"✅ '{soru}' sorusunu öğrendim."
+    except:
+        return "⚠️ Hatalı format."
+
+if "öğret" in mesaj_lc: return "🤖 Sadece kral öğretebilir."
+
+# NLP
+nlp_resp = nlp_cevap(mesaj_raw)
+if nlp_resp:
+    kaydet_context(user_id, mesaj_raw, nlp_resp)
+    return nlp_resp
+
+# Matematik
+mat_text = kelime_sayiyi_rakamla(mesaj_raw).replace("x","*")
+mat_res = hesapla(mat_text)
+if mat_res is not None:
+    kaydet_context(user_id, mesaj_raw, mat_res)
+    return mat_res
+
+# Hava durumu
+city = mesajdaki_sehir(mesaj_raw)
+if city: return hava_durumu(city)
+
+# Wikipedia (yalnızca diğerleri çalışmazsa)
+wiki_sonuc = wiki_ara(mesaj_raw)
+if wiki_sonuc:
+    kaydet_context(user_id, mesaj_raw, wiki_sonuc)
+    return wiki_sonuc
+
+# Fallback
+fallback = random.choice([
+    "Bunu anlamadım, tekrar sorabilir misin?",
+    "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)"
+])
+kaydet_context(user_id, mesaj_raw, fallback)
+return fallback
