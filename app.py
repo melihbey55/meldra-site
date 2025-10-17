@@ -138,17 +138,15 @@ def mesajdaki_sehir(mesaj):
     return None
 
 # -----------------------------
-# Wikipedia araştırma (arama ile)
+# Wikipedia araştırma
 # -----------------------------
 def wiki_ara(konu):
     try:
-        # Önce arama yap
         search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote_plus(konu)}&format=json"
         res = requests.get(search_url, timeout=5).json()
         search_results = res.get("query", {}).get("search", [])
         if search_results:
             title = search_results[0]["title"]
-            # Özet al
             summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote_plus(title)}"
             summary_res = requests.get(summary_url, timeout=5).json()
             if "extract" in summary_res:
@@ -202,7 +200,7 @@ def cevap_ver(mesaj, user_id="default"):
     city = mesajdaki_sehir(mesaj_raw)
     if city: return hava_durumu(city)
 
-    # Wikipedia araştırma
+    # Wikipedia
     wiki_sonuc = wiki_ara(mesaj_raw)
     if wiki_sonuc:
         kaydet_context(user_id, mesaj_raw, wiki_sonuc)
@@ -251,7 +249,9 @@ def nlp_dump():
     return jsonify(load_json(NLP_FILE))
 
 # -----------------------------
-# Sunucu başlatma
+# Sunucu başlatma (Render uyumlu)
 # -----------------------------
 if __name__=="__main__":
-    app.run(host="0.0.0.0", port=5000)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
