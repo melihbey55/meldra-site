@@ -3,12 +3,11 @@ import os, json, re, random, requests
 from difflib import SequenceMatcher
 from collections import deque
 from urllib.parse import quote
-from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
 # -----------------------------
-# Dosya yolları ve ayarlar
+# Dosya yolları
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NLP_FILE = os.path.join(BASE_DIR, "nlp_data.json")
@@ -18,18 +17,12 @@ user_context = {}
 king_mode = set()
 password_pending = set()
 
-# OpenWeatherMap API Key
 WEATHER_API_KEY = "6a7a443921825622e552d0cde2d2b688"
 
-# Türk şehirleri
 TURKISH_CITIES = [
-    "adana","adiyaman","afyonkarahisar","agri","amasya","ankara","antalya","artvin","aydin","balikesir",
-    "bilecik","bingol","bitlis","bolu","burdur","bursa","canakkale","cankiri","corum","denizli","diyarbakir",
-    "edirne","elazig","erzincan","erzurum","eskisehir","gaziantep","giresun","gumushane","hakkari","hatay",
-    "isparta","mersin","istanbul","izmir","kahramanmaras","karabuk","karaman","kars","kastamonu","kayseri",
-    "kirklareli","kirsehir","kocaeli","konya","kutahya","malatya","manisa","mardin","mus","nevsehir",
-    "nigde","ordu","osmaniye","rize","sakarya","samsun","sanliurfa","siirt","sinop","sivas","sirnak","tekirdag",
-    "tokat","trabzon","tunceli","usak","van","yalova","yozgat","zonguldak"
+    "adana","ankara","istanbul","izmir","antalya","bursa","gaziantep","konya",
+    "kayseri","trabzon","samsun","eskisehir","diyarbakir","malatya","van","rize",
+    "hatay","mardin","ordu","sakarya","mersin","tekirdag","zonguldak"
 ]
 
 # JSON dosyası yoksa oluştur
@@ -53,8 +46,10 @@ def save_json(file, data):
 # -----------------------------
 # Matematik
 # -----------------------------
-birimler = {"sıfır":0,"bir":1,"iki":2,"üç":3,"dört":4,"beş":5,"altı":6,"yedi":7,"sekiz":8,"dokuz":9}
-onlar = {"on":10,"yirmi":20,"otuz":30,"kırk":40,"elli":50,"altmış":60,"yetmiş":70,"seksen":80,"doksan":90}
+birimler = {"sıfır":0,"bir":1,"iki":2,"üç":3,"dört":4,"beş":5,
+            "altı":6,"yedi":7,"sekiz":8,"dokuz":9}
+onlar = {"on":10,"yirmi":20,"otuz":30,"kırk":40,"elli":50,
+         "altmış":60,"yetmiş":70,"seksen":80,"doksan":90}
 buyukler = {"yüz":100,"bin":1000,"milyon":1000000,"milyar":1000000000}
 islemler = {"artı":"+","eksi":"-","çarpı":"*","x":"*","bölü":"/"}
 
@@ -122,13 +117,13 @@ def hava_durumu(sehir):
     try:
         url = f"http://api.openweathermap.org/data/2.5/weather?q={quote(sehir.strip())}&appid={WEATHER_API_KEY}&units=metric&lang=tr"
         res = requests.get(url, timeout=6).json()
-        cod = str(res.get("cod",""))
-        if cod=="200" and "main" in res:
+        if str(res.get("cod")) == "200" and "main" in res:
             temp = res["main"]["temp"]
             desc = res["weather"][0]["description"]
             return f"{sehir.title()} şehrinde hava {temp}°C, {desc}."
-        return f"{sehir.title()} şehri için hava durumu bulunamadı."
-    except: return "Hava durumu alınamadı."
+        return f"{sehir.title()} için hava durumu bulunamadı."
+    except:
+        return "Hava durumu alınamadı."
 
 def mesajdaki_sehir(mesaj):
     mesaj_norm = re.sub(r'[^\w\s]','', mesaj.lower())
@@ -137,54 +132,66 @@ def mesajdaki_sehir(mesaj):
     return None
 
 # -----------------------------
-# Wikipedia
+# Wikipedia araştırma
 # -----------------------------
 def wiki_ara(konu):
     try:
         headers = {"User-Agent": "MeldraBot/1.0"}
         search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
         res = requests.get(search_url, headers=headers, timeout=10).json()
-        search_results = res.get("query", {}).get("search", [])
-        if search_results:
-            title = search_results[0]["title"]
-            summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
-            summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
-            if "extract" in summary_res:
-                return summary_res["extract"]
+        results = res.get("query", {}).get("search", [])
+        if not results:
+            return None
+        title = results[0]["title"]
+        summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
+        summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
+        return summary_res.get("extract")
+    except:
+        return None
+
+# -----------------------------
+# Ekstra Web araştırma (DuckDuckGo API)
+# -----------------------------
+def web_ara(konu):
+    try:
+        url = f"https://api.duckduckgo.com/?q={quote(konu)}&format=json&lang=tr"
+        r = requests.get(url, timeout=8).json()
+        text = r.get("AbstractText") or r.get("Heading")
+        if text:
+            return text
     except:
         return None
     return None
 
 # -----------------------------
-# WikiHow tarifleri
+# Yemek tarifi özelliği
 # -----------------------------
-def wikihow_tarif(soru):
+def yemek_tarifi(konu):
     try:
-        search_url = f"https://www.wikihow.com/wikiHowTo?search={quote(soru)}"
-        headers = {"User-Agent": "MeldraBot/1.0"}
-        res = requests.get(search_url, headers=headers, timeout=10)
-        soup = BeautifulSoup(res.text, "html.parser")
-        first_link = soup.select_one("a.result_link")
-        if first_link:
-            link = "https://www.wikihow.com" + first_link["href"]
-            page_res = requests.get(link, headers=headers, timeout=10)
-            page_soup = BeautifulSoup(page_res.text, "html.parser")
-            steps = page_soup.select("div.step p, div.step")
-            text = "\n".join([s.get_text(strip=True) for s in steps if s.get_text(strip=True)])
-            if text.strip():
-                return text
+        # Örnek basit API: themealdb (ücretsiz)
+        url = f"https://www.themealdb.com/api/json/v1/1/search.php?s={quote(konu)}"
+        r = requests.get(url, timeout=8).json()
+        meals = r.get("meals")
+        if not meals:
+            return None
+        meal = meals[0]
+        name = meal["strMeal"]
+        instructions = meal["strInstructions"]
+        return f"🍽️ {name} tarifi:\n{instructions[:600]}..."  # Uzun tarifin ilk kısmı
     except:
         return None
-    return None
+
+def tarif_var_mi(mesaj):
+    return any(x in mesaj.lower() for x in ["tarifi","nasıl yapılır","yapımı","tarif"])
 
 # -----------------------------
 # Cevap motoru
 # -----------------------------
 def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
-    mesaj_lc = mesaj_raw.lower()
+    mesaj_lc = mesaj_raw.lower().strip()
 
-    # Kral modu
+    # Kral modu (öğretme)
     if mesaj_lc=="her biji amasya":
         password_pending.add(user_id)
         return "Parolayı giriniz:"
@@ -216,23 +223,8 @@ def cevap_ver(mesaj, user_id="default"):
         except:
             return "⚠️ Hatalı format."
 
-    if "öğret" in mesaj_lc: return "🤖 Sadece kral öğretebilir."
-
-    # Hava durumu
-    city = mesajdaki_sehir(mesaj_raw)
-    if city: return hava_durumu(city)
-
-    # WikiHow
-    wh_tarif = wikihow_tarif(mesaj_raw)
-    if wh_tarif:
-        kaydet_context(user_id, mesaj_raw, wh_tarif)
-        return wh_tarif
-
-    # Wikipedia
-    wiki_sonuc = wiki_ara(mesaj_raw)
-    if wiki_sonuc:
-        kaydet_context(user_id, mesaj_raw, wiki_sonuc)
-        return wiki_sonuc
+    if "öğret" in mesaj_lc: 
+        return "🤖 Sadece kral öğretebilir."
 
     # NLP
     nlp_resp = nlp_cevap(mesaj_raw)
@@ -247,7 +239,32 @@ def cevap_ver(mesaj, user_id="default"):
         kaydet_context(user_id, mesaj_raw, mat_res)
         return mat_res
 
-    # Fallback
+    # Hava durumu
+    city = mesajdaki_sehir(mesaj_raw)
+    if city: 
+        return hava_durumu(city)
+
+    # Yemek tarifi
+    if tarif_var_mi(mesaj_raw):
+        konu = mesaj_raw.replace("tarifi","").replace("nasıl yapılır","").strip()
+        tarif = yemek_tarifi(konu)
+        if tarif:
+            return tarif
+        else:
+            return f"'{konu}' için tarif bulunamadı."
+
+    # Wikipedia
+    wiki_sonuc = wiki_ara(mesaj_raw)
+    if wiki_sonuc:
+        kaydet_context(user_id, mesaj_raw, wiki_sonuc)
+        return wiki_sonuc
+
+    # Web araması (fallback)
+    web_sonuc = web_ara(mesaj_raw)
+    if web_sonuc:
+        kaydet_context(user_id, mesaj_raw, web_sonuc)
+        return web_sonuc
+
     fallback = random.choice([
         "Bunu anlamadım, tekrar sorabilir misin?",
         "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)"
@@ -276,9 +293,6 @@ def chat():
 def nlp_dump():
     return jsonify(load_json(NLP_FILE))
 
-# -----------------------------
-# Sunucu başlatma
-# -----------------------------
 if __name__=="__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
