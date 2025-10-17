@@ -193,7 +193,10 @@ def yemek_tarifi(konu):
         detay_url = link["href"]
         detay_html = requests.get(detay_url, headers=headers, timeout=10).text
         detay_soup = BeautifulSoup(detay_html, "html.parser")
-        baslik = detay_soup.select_one("h1.recipe-title").get_text(strip=True)
+        baslik_tag = detay_soup.select_one("h1.recipe-title")
+        if not baslik_tag:
+            return None
+        baslik = baslik_tag.get_text(strip=True)
         adimlar = detay_soup.select("div.recipe-preparation p")
         text = " ".join([a.get_text(strip=True) for a in adimlar])[:600]
         return f"🍳 {baslik} tarifi (Nefis Yemek Tarifleri):\n{text}..."
@@ -263,7 +266,7 @@ def cevap_ver(mesaj, user_id="default"):
 
     # Yemek tarifi
     if tarif_var_mi(mesaj_raw):
-        konu = mesaj_raw.replace("tarifi","").replace("nasıl yapılır","").strip()
+        konu = re.sub(r'(tarifi|nasıl yapılır|yapımı|tarif)', '', mesaj_raw, flags=re.IGNORECASE).strip()
         tarif = yemek_tarifi(konu)
         if tarif:
             return tarif
