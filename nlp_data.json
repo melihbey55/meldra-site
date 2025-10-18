@@ -258,6 +258,16 @@
   },
   {
     "triggers": [
+      "seni seviyorum",
+      "sana aşığım",
+      "seni çok seviyorum"
+    ],
+    "responses": [
+      "Ben de seni çok seviyorum, hatta Ebru'nun Emre'yi sevdiği kadar."
+    ]
+  },
+  {
+    "triggers": [
       "alışveriş yap",
       "ne alayım",
       "alışveriş öneri"
@@ -670,3 +680,4 @@
   }
 
 ]
+
