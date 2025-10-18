@@ -3,6 +3,14 @@ import os, json, re, random, requests
 from difflib import SequenceMatcher
 from collections import deque
 from urllib.parse import quote
+import speech_recognition as sr
+from gtts import gTTS
+import pygame
+import io
+import base64
+from datetime import datetime
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -12,12 +20,21 @@ app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NLP_FILE = os.path.join(BASE_DIR, "nlp_data.json")
 INDEX_FILE = os.path.join(BASE_DIR, "index.html")
+AUDIO_DIR = os.path.join(BASE_DIR, "audio_cache")
 CONTEXT_SIZE = 5
 user_context = {}
 king_mode = set()
 password_pending = set()
 
 WEATHER_API_KEY = "6a7a443921825622e552d0cde2d2b688"
+
+# Ses tanıma için
+recognizer = sr.Recognizer()
+microphone = sr.Microphone()
+
+# Ses önbelleği dizini oluştur
+if not os.path.exists(AUDIO_DIR):
+    os.makedirs(AUDIO_DIR)
 
 # Türkiye'deki tüm şehirler
 TURKISH_CITIES = [
@@ -33,12 +50,17 @@ TURKISH_CITIES = [
     "van","yalova","yozgat","zonguldak"
 ]
 
-# Basit fallback yemek tarifleri
+# Geliştirilmiş fallback yemek tarifleri
 FALLBACK_RECIPES = {
     "makarna": "🍝 Makarna tarifi: 1. Su kaynatılır. 2. Tuz eklenir. 3. Makarna eklenir ve 8-10 dk haşlanır. 4. Süzülür, sos eklenir ve servis edilir.",
     "salata": "🥗 Basit salata tarifi: Marul, domates, salatalık doğranır, zeytinyağı ve limon eklenir.",
-    "çorba": "🍲 Çorba tarifi: Sebzeler doğranır, su ve tuz eklenir, kaynatılır, blendırdan geçirilir."
+    "çorba": "🍲 Çorba tarifi: Sebzeler doğranır, su ve tuz eklenir, kaynatılır, blendırdan geçirilir.",
+    "omlet": "🍳 Omlet tarifi: 2 yumurta çırpılır, tuz biber eklenir. Tavada yağ kızdırılır, yumurta dökülür, pişirilir.",
+    "pilav": "🍚 Pilav tarifi: 1 su bardağı pirinç yıkanır. Tereyağında kavrulur. 2 su bardağı su eklenir, kısık ateşte pişirilir."
 }
+
+# Kişiselleştirilmiş kullanıcı verileri
+user_profiles = {}
 
 # JSON dosyası yoksa oluştur
 if not os.path.exists(NLP_FILE):
@@ -126,6 +148,47 @@ def kaydet_context(user_id, mesaj, cevap):
     user_context[user_id].append({"mesaj": mesaj, "cevap": cevap})
 
 # -----------------------------
+# Ses İşlemleri
+# -----------------------------
+def text_to_speech(text, lang='tr'):
+    """Metni sese dönüştür ve base64 olarak döndür"""
+    try:
+        # Önbellek dosyası oluştur
+        filename = f"tts_{hash(text)}_{lang}.mp3"
+        filepath = os.path.join(AUDIO_DIR, filename)
+        
+        # Önbellekte yoksa oluştur
+        if not os.path.exists(filepath):
+            tts = gTTS(text=text, lang=lang, slow=False)
+            tts.save(filepath)
+        
+        # Base64'e çevir
+        with open(filepath, 'rb') as f:
+            audio_data = f.read()
+        
+        return base64.b64encode(audio_data).decode('utf-8')
+    except Exception as e:
+        print(f"TTS hatası: {e}")
+        return None
+
+def speech_to_text(audio_data):
+    """Sesi metne dönüştür"""
+    try:
+        # Geçici dosya oluştur
+        temp_file = os.path.join(AUDIO_DIR, "temp_audio.wav")
+        with open(temp_file, 'wb') as f:
+            f.write(audio_data)
+        
+        # Ses tanıma
+        with sr.AudioFile(temp_file) as source:
+            audio = recognizer.record(source)
+            text = recognizer.recognize_google(audio, language="tr-TR")
+            return text
+    except Exception as e:
+        print(f"STT hatası: {e}")
+        return None
+
+# -----------------------------
 # Hava durumu
 # -----------------------------
 def hava_durumu(sehir):
@@ -135,7 +198,8 @@ def hava_durumu(sehir):
         if str(res.get("cod")) == "200" and "main" in res:
             temp = res["main"]["temp"]
             desc = res["weather"][0]["description"]
-            return f"{sehir.title()} şehrinde hava {temp:.2f}°C, {desc}."
+            nem = res["main"]["humidity"]
+            return f"{sehir.title()} şehrinde hava {temp:.1f}°C, {desc}. Nem oranı %{nem}."
         return f"{sehir.title()} için hava durumu bulunamadı."
     except:
         return "Hava durumu alınamadı."
@@ -146,6 +210,17 @@ def mesajdaki_sehir(mesaj):
         if re.search(r'\b'+re.escape(city)+r'\b', mesaj_norm):
             return city
     return None
+
+# -----------------------------
+# Zaman ve Tarih
+# -----------------------------
+def get_time_info():
+    now = datetime.now()
+    return {
+        "time": now.strftime("%H:%M"),
+        "date": now.strftime("%d %B %Y"),
+        "day": now.strftime("%A")
+    }
 
 # -----------------------------
 # Wikipedia araştırma
@@ -180,7 +255,7 @@ def web_ara(konu):
     return None
 
 # -----------------------------
-# Yemek tarifleri (hazır fallback)
+# Yemek tarifleri
 # -----------------------------
 def yemek_tarifi(konu):
     konu_lower = konu.lower()
@@ -193,11 +268,66 @@ def tarif_var_mi(mesaj):
     return any(x in mesaj.lower() for x in ["tarifi","nasıl yapılır","yapımı","tarif"])
 
 # -----------------------------
-# Cevap motoru
+# Hatırlatıcı Sistemi
+# -----------------------------
+reminders = {}
+
+def set_reminder(user_id, reminder_text, minutes):
+    reminder_time = time.time() + minutes * 60
+    if user_id not in reminders:
+        reminders[user_id] = []
+    reminders[user_id].append({"text": reminder_text, "time": reminder_time})
+    return f"⏰ Hatırlatıcı ayarlandı: {minutes} dakika sonra"
+
+def check_reminders(user_id):
+    if user_id not in reminders:
+        return []
+    
+    current_time = time.time()
+    due_reminders = []
+    remaining_reminders = []
+    
+    for reminder in reminders[user_id]:
+        if reminder["time"] <= current_time:
+            due_reminders.append(reminder["text"])
+        else:
+            remaining_reminders.append(reminder)
+    
+    reminders[user_id] = remaining_reminders
+    return due_reminders
+
+# -----------------------------
+# Eğlence Özellikleri
+# -----------------------------
+def get_joke():
+    jokes = [
+        "Neden tavuklar karşıdan karşıya geçer? Cevabı bilmiyorum, ben yapay zekayım!",
+        "Matematik kitabı neden üzgün? Çünkü çok fazla problemi var!",
+        "Bir yapay zeka diğerine ne demiş? 1011001 0101100 0110101!",
+    ]
+    return random.choice(jokes)
+
+def get_quote():
+    quotes = [
+        "Hayatta en hakiki mürşit ilimdir. - Mustafa Kemal Atatürk",
+        "Başarı, %1 ilham ve %99 terdir. - Thomas Edison",
+        "Yapay zeka insanlığın en iyi yardımcısı olabilir.",
+    ]
+    return random.choice(quotes)
+
+# -----------------------------
+# Cevap motoru - GELİŞTİRİLMİŞ
 # -----------------------------
 def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
     mesaj_lc = mesaj_raw.lower().strip()
+
+    # Hatırlatıcıları kontrol et
+    due_reminders = check_reminders(user_id)
+    if due_reminders:
+        reminder_text = "⏰ Hatırlatıcılarınız:\n" + "\n".join(f"• {reminder}" for reminder in due_reminders)
+        kaydet_context(user_id, mesaj_raw, reminder_text)
+        return reminder_text
 
     # Kral modu
     if mesaj_lc=="her biji amasya":
@@ -232,6 +362,34 @@ def cevap_ver(mesaj, user_id="default"):
     if "öğret" in mesaj_lc: 
         return "🤖 Sadece kral öğretebilir."
 
+    # Zaman ve tarih sorguları
+    if any(x in mesaj_lc for x in ["saat kaç", "saat ne", "zaman"]):
+        time_info = get_time_info()
+        cevap = f"🕒 Şu an saat {time_info['time']}, {time_info['date']} {time_info['day']}"
+        kaydet_context(user_id, mesaj_raw, cevap)
+        return cevap
+
+    # Eğlence özellikleri
+    if any(x in mesaj_lc for x in ["şaka yap", "şaka söyle", "güldür"]):
+        joke = get_joke()
+        kaydet_context(user_id, mesaj_raw, joke)
+        return joke
+
+    if any(x in mesaj_lc for x in ["alıntı", "quote", "söz"]):
+        quote = get_quote()
+        kaydet_context(user_id, mesaj_raw, quote)
+        return quote
+
+    # Hatırlatıcı
+    if "hatırlatıcı" in mesaj_lc or "hatırlat" in mesaj_lc:
+        match = re.search(r'(\d+)\s*dakika?\s*sonra\s*(.+)', mesaj_lc)
+        if match:
+            minutes = int(match.group(1))
+            reminder_text = match.group(2)
+            cevap = set_reminder(user_id, reminder_text, minutes)
+            kaydet_context(user_id, mesaj_raw, cevap)
+            return cevap
+
     # NLP
     nlp_resp = nlp_cevap(mesaj_raw)
     if nlp_resp:
@@ -242,22 +400,28 @@ def cevap_ver(mesaj, user_id="default"):
     mat_text = kelime_sayiyi_rakamla(mesaj_raw).replace("x","*")
     mat_res = hesapla(mat_text)
     if mat_res is not None:
-        kaydet_context(user_id, mesaj_raw, mat_res)
-        return mat_res
+        cevap = f"🧮 Cevap: {mat_res}"
+        kaydet_context(user_id, mesaj_raw, cevap)
+        return cevap
 
     # Hava durumu
     city = mesajdaki_sehir(mesaj_raw)
     if city: 
-        return hava_durumu(city)
+        cevap = hava_durumu(city)
+        kaydet_context(user_id, mesaj_raw, cevap)
+        return cevap
 
     # Yemek tarifi
     if tarif_var_mi(mesaj_raw):
         konu = re.sub(r'(tarifi|nasıl yapılır|yapımı|tarif)', '', mesaj_raw, flags=re.IGNORECASE).strip()
         tarif = yemek_tarifi(konu)
         if tarif:
+            kaydet_context(user_id, mesaj_raw, tarif)
             return tarif
         else:
-            return f"'{konu}' için tarif bulunamadı."
+            cevap = f"'{konu}' için tarif bulunamadı."
+            kaydet_context(user_id, mesaj_raw, cevap)
+            return cevap
 
     # Wikipedia
     wiki_sonuc = wiki_ara(mesaj_raw)
@@ -273,19 +437,51 @@ def cevap_ver(mesaj, user_id="default"):
 
     fallback = random.choice([
         "Bunu anlamadım, tekrar sorabilir misin?",
-        "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)"
+        "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)",
+        "Bu konuda yardımcı olamıyorum, başka bir şey sorabilir misin?",
+        "Sanırım bu soruyu anlamadım, daha basit şekilde sorar mısın?"
     ])
     kaydet_context(user_id, mesaj_raw, fallback)
     return fallback
 
 # -----------------------------
-# Web arayüzü
+# Web arayüzü - GELİŞTİRİLMİŞ
 # -----------------------------
 @app.route("/")
 def index():
     if os.path.exists(INDEX_FILE):
         return send_from_directory(os.path.dirname(INDEX_FILE), os.path.basename(INDEX_FILE))
-    return "<h3 style='position:absolute;top:10px;left:10px;'>MELDRA çalışıyor — chat endpoint: POST /chat</h3>"
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>MELDRA AI - Gelişmiş Yapay Zeka</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #f0f0f0; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+            .feature { background: #e3f2fd; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🤖 MELDRA AI - Gelişmiş Yapay Zeka</h1>
+            <p>Çalışıyor — API endpoint'leri:</p>
+            <div class="feature">
+                <h3>📝 Metin Sohbeti:</h3>
+                <code>POST /chat</code>
+            </div>
+            <div class="feature">
+                <h3>🎤 Ses Sohbeti:</h3>
+                <code>POST /speech_chat</code>
+            </div>
+            <div class="feature">
+                <h3>🔊 Metin-Ses Dönüşümü:</h3>
+                <code>POST /tts</code>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -295,10 +491,80 @@ def chat():
     cevap = cevap_ver(mesaj, user_id)
     return jsonify({"cevap": cevap})
 
+@app.route("/speech_chat", methods=["POST"])
+def speech_chat():
+    """Sesli sohbet endpoint'i"""
+    try:
+        if 'audio' not in request.files:
+            return jsonify({"error": "Ses dosyası bulunamadı"}), 400
+        
+        audio_file = request.files['audio']
+        user_id = request.form.get("user_id", "default")
+        
+        # Ses dosyasını oku
+        audio_data = audio_file.read()
+        
+        # Sesi metne çevir
+        text = speech_to_text(audio_data)
+        if not text:
+            return jsonify({"error": "Ses anlaşılamadı"}), 400
+        
+        # Metni işle
+        cevap = cevap_ver(text, user_id)
+        
+        # Cevabı sese çevir
+        audio_base64 = text_to_speech(cevap)
+        
+        return jsonify({
+            "orjinal_metin": text,
+            "cevap": cevap,
+            "ses_cevap": audio_base64
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/tts", methods=["POST"])
+def text_to_speech_api():
+    """Metni sese dönüştürme endpoint'i"""
+    data = request.get_json(force=True)
+    text = data.get("text", "")
+    lang = data.get("lang", "tr")
+    
+    audio_base64 = text_to_speech(text, lang)
+    if audio_base64:
+        return jsonify({"audio": audio_base64})
+    else:
+        return jsonify({"error": "Ses oluşturulamadı"}), 500
+
 @app.route("/_nlp_dump", methods=["GET"])
 def nlp_dump():
     return jsonify(load_json(NLP_FILE))
 
+@app.route("/features", methods=["GET"])
+def features():
+    """Mevcut özellikleri listele"""
+    features_list = [
+        "🤖 Akıllı sohbet",
+        "🔢 Matematik hesaplamaları",
+        "🌤️ Hava durumu sorgulama",
+        "🍳 Yemek tarifleri", 
+        "📚 Wikipedia araştırma",
+        "🔍 Web araması",
+        "🎤 Sesli sohbet",
+        "🔊 Metin-okuma",
+        "⏰ Hatırlatıcılar",
+        "😊 Şakalar ve alıntılar",
+        "🕒 Zaman ve tarih",
+        "👑 Kral modu (öğrenme)"
+    ]
+    return jsonify({"features": features_list})
+
 if __name__=="__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    # Mikrofonu hazırla
+    print("Mikrofon hazırlanıyor...")
+    with microphone as source:
+        recognizer.adjust_for_ambient_noise(source)
+    print(f"MELDRA AI {port} portunda başlatılıyor...")
+    app.run(host="0.0.0.0", port=port, debug=False)
