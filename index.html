@@ -1,65 +1,646 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MELDRA Chat</title>
-<style>
-    * {margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif;}
-    body, html {height:100%;width:100%;background:#0a0f2c;color:#fff;}
-    header {height:60px;background:#001f5c;display:flex;align-items:center;padding:0 20px;font-size:24px;font-weight:bold;box-shadow:0 2px 5px rgba(0,0,0,0.3);}
-    #chat-container {display:flex;flex-direction:column;height:calc(100% - 60px);padding:10px;overflow-y:auto;}
-    .message {max-width:70%;margin:5px 0;padding:10px 15px;border-radius:15px;word-wrap:break-word;}
-    .user {align-self:flex-end;background:#1e90ff;color:#fff;border-bottom-right-radius:0;}
-    .bot {align-self:flex-start;background:#11182b;color:#fff;border-bottom-left-radius:0;}
-    #input-area {position:fixed;bottom:0;left:0;width:100%;display:flex;padding:10px;background:#001f5c;}
-    #msg {flex:1;padding:10px;border-radius:10px;border:none;font-size:16px;}
-    #send-btn {padding:10px 20px;margin-left:10px;background:#1e90ff;border:none;color:#fff;border-radius:10px;font-size:16px;cursor:pointer;}
-    #send-btn:hover {background:#4da6ff;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MELDRA - Akıllı Yapay Zeka Asistanı</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #1e88e5;
+            --primary-dark: #1565c0;
+            --primary-light: #64b5f6;
+            --secondary: #0288d1;
+            --accent: #4fc3f7;
+            --light: #e3f2fd;
+            --dark: #0d47a1;
+            --text: #212121;
+            --text-light: #757575;
+            --white: #ffffff;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--dark) 100%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0;
+            color: var(--white);
+            margin-bottom: 20px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .logo i {
+            font-size: 2.5rem;
+            background: var(--white);
+            color: var(--primary);
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow);
+        }
+        
+        .logo h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .tagline {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        
+        .main-content {
+            display: flex;
+            gap: 30px;
+            flex: 1;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+        }
+        
+        .chat-container {
+            flex: 2;
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .chat-header {
+            background: var(--primary);
+            color: var(--white);
+            padding: 20px;
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 15px;
+            border-radius: 18px;
+            line-height: 1.5;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .user-message {
+            align-self: flex-end;
+            background: var(--primary-light);
+            color: var(--dark);
+            border-bottom-right-radius: 5px;
+        }
+        
+        .bot-message {
+            align-self: flex-start;
+            background: var(--light);
+            border-bottom-left-radius: 5px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .message-time {
+            font-size: 0.7rem;
+            opacity: 0.7;
+            margin-top: 5px;
+            text-align: right;
+        }
+        
+        .chat-input-container {
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 30px;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        .chat-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.2);
+        }
+        
+        .send-btn, .voice-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1.2rem;
+        }
+        
+        .send-btn:hover, .voice-btn:hover {
+            background: var(--primary-dark);
+            transform: scale(1.05);
+        }
+        
+        .voice-btn.recording {
+            background: #f44336;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+        }
+        
+        .features-container {
+            flex: 1;
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .features-header {
+            font-size: 1.5rem;
+            color: var(--primary);
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .features-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex: 1;
+        }
+        
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: var(--light);
+            border-radius: 12px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .feature:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+        
+        .feature-text {
+            flex: 1;
+        }
+        
+        .feature-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--dark);
+        }
+        
+        .feature-desc {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+        
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            background: var(--light);
+            padding: 15px;
+            border-radius: 18px;
+            border-bottom-left-radius: 5px;
+        }
+        
+        .typing-dots {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-light);
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--white);
+            margin-top: 20px;
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        .powered-by {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .api-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+        }
+    </style>
 </head>
 <body>
-<header>MELDRA</header>
-<div id="chat-container"></div>
-<div id="input-area">
-    <input type="text" id="msg" placeholder="Mesajınızı yazın...">
-    <button id="send-btn">Gönder</button>
-</div>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-robot"></i>
+                <h1>MELDRA</h1>
+            </div>
+            <p class="tagline">Akıllı yapay zeka asistanınız. Sorularınızı yanıtlar, görevlerinizde size yardımcı olur ve bilgi sağlar.</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <i class="fas fa-comments"></i> Meldra ile Sohbet
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message bot-message">
+                        Merhaba! Ben Meldra, yapay zeka asistanınız. Size nasıl yardımcı olabilirim?
+                        <div class="message-time">Şimdi</div>
+                    </div>
+                </div>
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="typing-dots">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Meldra'ya bir şey sorun...">
+                    <button class="voice-btn" id="voiceBtn" title="Sesli Sohbet">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="send-btn" id="sendBtn" title="Gönder">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="features-container">
+                <div class="features-header">
+                    <i class="fas fa-star"></i> Meldra Özellikleri
+                </div>
+                <div class="features-list">
+                    <div class="feature" data-command="Hava durumu nedir?">
+                        <div class="feature-icon">
+                            <i class="fas fa-cloud-sun"></i>
+                        </div>
+                        <div class="feature-text">
+                            <div class="feature-title">Hava Durumu</div>
+                            <div class="feature-desc">Herhangi bir şehrin hava durumu bilgisi</div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature" data-command="Makarna tarifi">
+                        <div class="feature-icon">
+                            <i class="fas fa-utensils"></i>
+                        </div>
+                        <div class="feature-text">
+                            <div class="feature-title">Yemek Tarifleri</div>
+                            <div class="feature-desc">Lezzetli yemek tarifleri ve pişirme ipuçları</div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature" data-command="25 artı 17">
+                        <div class="feature-icon">
+                            <i class="fas fa-calculator"></i>
+                        </div>
+                        <div class="feature-text">
+                            <div class="feature-title">Matematik Hesapları</div>
+                            <div class="feature-desc">Aritmetik işlemler ve matematiksel hesaplamalar</div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature" data-command="Mustafa Kemal Atatürk kimdir?">
+                        <div class="feature-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div class="feature-text">
+                            <div class="feature-title">Bilgi Araştırma</div>
+                            <div class="feature-desc">Wikipedia ve web'den bilgi arama</div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature" data-command="Saat kaç?">
+                        <div class="feature-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="feature-text">
+                            <div class="feature-title">Zaman ve Tarih</div>
+                            <div class="feature-desc">Güncel saat, tarih ve gün bilgisi</div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature" data-command="Bana bir şaka yap">
+                        <div class="feature-icon">
+                            <i class="fas fa-laugh-beam"></i>
+                        </div>
+                        <div class="feature-text">
+                            <div class="feature-title">Eğlence</div>
+                            <div class="feature-desc">Şakalar, alıntılar ve eğlenceli içerikler</div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature" data-command="30 dakika sonra egzersiz yapmayı hatırlat">
+                        <div class="feature-icon">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                        <div class="feature-text">
+                            <div class="feature-title">Hatırlatıcılar</div>
+                            <div class="feature-desc">Zamanlı hatırlatıcılar ve görev takibi</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <div>© 2023 MELDRA - Akıllı Yapay Zeka Asistanı</div>
+            <div class="powered-by">
+                <span class="api-status">
+                    <span class="status-dot"></span> API Bağlantısı Aktif
+                </span>
+            </div>
+        </footer>
+    </div>
 
-<script>
-const chatContainer = document.getElementById('chat-container');
-const msgInput = document.getElementById('msg');
-const sendBtn = document.getElementById('send-btn');
-
-function appendMessage(text, sender){
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('message', sender);
-    msgDiv.textContent = text;
-    chatContainer.appendChild(msgDiv);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-
-async function sendMessage(){
-    const text = msgInput.value.trim();
-    if(!text) return;
-    appendMessage(text, 'user');
-    msgInput.value = '';
-    
-    try{
-        const res = await fetch('/chat', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({mesaj:text, user_id:'default'})
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatInput = document.getElementById('chatInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const voiceBtn = document.getElementById('voiceBtn');
+            const chatMessages = document.getElementById('chatMessages');
+            const typingIndicator = document.getElementById('typingIndicator');
+            
+            // Özelliklere tıklama olayları
+            document.querySelectorAll('.feature').forEach(feature => {
+                feature.addEventListener('click', function() {
+                    const command = this.getAttribute('data-command');
+                    chatInput.value = command;
+                    sendMessage();
+                });
+            });
+            
+            // Mesaj gönderme fonksiyonu
+            function sendMessage() {
+                const message = chatInput.value.trim();
+                if (message === '') return;
+                
+                // Kullanıcı mesajını ekle
+                addMessage(message, 'user');
+                chatInput.value = '';
+                
+                // Yazıyor göstergesini göster
+                showTypingIndicator();
+                
+                // API'ye istek gönder
+                fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        mesaj: message,
+                        user_id: 'web_user'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Yazıyor göstergesini gizle
+                    hideTypingIndicator();
+                    
+                    // Bot yanıtını ekle
+                    addMessage(data.cevap, 'bot');
+                })
+                .catch(error => {
+                    // Yazıyor göstergesini gizle
+                    hideTypingIndicator();
+                    
+                    // Hata mesajını göster
+                    addMessage('Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.', 'bot');
+                    console.error('Hata:', error);
+                });
+            }
+            
+            // Mesaj ekleme fonksiyonu
+            function addMessage(text, sender) {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+                messageDiv.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
+                
+                const time = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                
+                messageDiv.innerHTML = `
+                    ${text}
+                    <div class="message-time">${time}</div>
+                `;
+                
+                chatMessages.appendChild(messageDiv);
+                
+                // Otomatik scroll
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Yazıyor göstergesi
+            function showTypingIndicator() {
+                typingIndicator.style.display = 'block';
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            function hideTypingIndicator() {
+                typingIndicator.style.display = 'none';
+            }
+            
+            // Enter tuşu ile gönderme
+            chatInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // Gönder butonu
+            sendBtn.addEventListener('click', sendMessage);
+            
+            // Sesli sohbet butonu
+            let isRecording = false;
+            let recognition = null;
+            
+            // Web Speech API desteğini kontrol et
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'tr-TR';
+                
+                recognition.onstart = function() {
+                    isRecording = true;
+                    voiceBtn.classList.add('recording');
+                    voiceBtn.innerHTML = '<i class="fas fa-square"></i>';
+                };
+                
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    chatInput.value = transcript;
+                    isRecording = false;
+                    voiceBtn.classList.remove('recording');
+                    voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    
+                    // Otomatik olarak gönder
+                    sendMessage();
+                };
+                
+                recognition.onerror = function(event) {
+                    console.error('Ses tanıma hatası:', event.error);
+                    isRecording = false;
+                    voiceBtn.classList.remove('recording');
+                    voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    
+                    if (event.error === 'not-allowed') {
+                        addMessage('Mikrofon erişimine izin vermeniz gerekiyor.', 'bot');
+                    }
+                };
+                
+                recognition.onend = function() {
+                    isRecording = false;
+                    voiceBtn.classList.remove('recording');
+                    voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                };
+                
+                voiceBtn.addEventListener('click', function() {
+                    if (isRecording) {
+                        recognition.stop();
+                    } else {
+                        try {
+                            recognition.start();
+                        } catch (error) {
+                            console.error('Ses tanıma başlatılamadı:', error);
+                        }
+                    }
+                });
+            } else {
+                // Tarayıcı desteklemiyorsa butonu devre dışı bırak
+                voiceBtn.style.opacity = '0.5';
+                voiceBtn.title = 'Ses tanıma desteklenmiyor';
+                voiceBtn.addEventListener('click', function() {
+                    addMessage('Tarayıcınız ses tanıma özelliğini desteklemiyor.', 'bot');
+                });
+            }
+            
+            // Sayfa yüklendiğinde input'a odaklan
+            chatInput.focus();
         });
-        const data = await res.json();
-        appendMessage(data.cevap, 'bot');
-    }catch(e){
-        appendMessage("⚠️ Bot ile iletişim kurulamadı.", 'bot');
-    }
-}
-
-sendBtn.addEventListener('click', sendMessage);
-msgInput.addEventListener('keypress', e=>{if(e.key==='Enter') sendMessage();});
-</script>
+    </script>
 </body>
 </html>
