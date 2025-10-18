@@ -27,10 +27,6 @@ WEATHER_API_KEY = "6a7a443921825622e552d0cde2d2b688"
 # Ses özellikleri devre dışı - Render uyumluluğu için
 SPEECH_ENABLED = False
 
-# Ses önbelleği dizini oluştur
-if not os.path.exists(AUDIO_DIR):
-    os.makedirs(AUDIO_DIR)
-
 # Türkiye'deki tüm şehirler
 TURKISH_CITIES = [
     "adana","adiyaman","afyonkarahisar","agri","aksaray","amasya","ankara","antalya",
@@ -51,11 +47,10 @@ FALLBACK_RECIPES = {
     "salata": "🥗 Basit salata tarifi: Marul, domates, salatalık doğranır, zeytinyağı ve limon eklenir.",
     "çorba": "🍲 Çorba tarifi: Sebzeler doğranır, su ve tuz eklenir, kaynatılır, blendırdan geçirilir.",
     "omlet": "🍳 Omlet tarifi: 2 yumurta çırpılır, tuz biber eklenir. Tavada yağ kızdırılır, yumurta dökülür, pişirilir.",
-    "pilav": "🍚 Pilav tarifi: 1 su bardağı pirinç yıkanır. Tereyağında kavrulur. 2 su bardağı su eklenir, kısık ateşte pişirilir."
+    "pilav": "🍚 Pilav tarifi: 1 su bardağı pirinç yıkanır. Tereyağında kavrulur. 2 su bardağı su eklenir, kısık ateşte pişirilir.",
+    "menemen": "🍳 Menemen tarifi: 1. Soğan ve biberleri yağda kavurun. 2. Domatesleri ekleyip pişirin. 3. Yumurtaları kırın, karıştırın ve pişirin. 4. Tuz, karabiber ekleyip sıcak servis yapın.",
+    "kek": "🧁 Kek tarifi: 3 yumurta, 1 su bardağı şeker çırpılır. 1 su bardağı süt, 1 su bardağı sıvı yağ, 3 su bardağı un, 1 paket kabartma tozu eklenir. 180°C fırında 40 dakika pişirilir."
 }
-
-# Kişiselleştirilmiş kullanıcı verileri
-user_profiles = {}
 
 # JSON dosyası yoksa oluştur
 if not os.path.exists(NLP_FILE):
@@ -143,37 +138,46 @@ def kaydet_context(user_id, mesaj, cevap):
     user_context[user_id].append({"mesaj": mesaj, "cevap": cevap})
 
 # -----------------------------
-# Ses İşlemleri (Render için devre dışı)
-# -----------------------------
-def text_to_speech(text, lang='tr'):
-    """Metni sese dönüştür - Render için devre dışı"""
-    return None
-
-def speech_to_text(audio_data):
-    """Sesi metne dönüştür - Render için devre dışı"""
-    return None
-
-# -----------------------------
-# Hava durumu
+# Geliştirilmiş Hava Durumu
 # -----------------------------
 def hava_durumu(sehir):
     try:
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={quote(sehir.strip())}&appid={WEATHER_API_KEY}&units=metric&lang=tr"
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={quote(sehir.strip())},TR&appid={WEATHER_API_KEY}&units=metric&lang=tr"
         res = requests.get(url, timeout=6).json()
-        if str(res.get("cod")) == "200" and "main" in res:
+        
+        if res.get("cod") == 200 and "main" in res:
             temp = res["main"]["temp"]
-            desc = res["weather"][0]["description"]
-            nem = res["main"]["humidity"]
-            return f"{sehir.title()} şehrinde hava {temp:.1f}°C, {desc}. Nem oranı %{nem}."
-        return f"{sehir.title()} için hava durumu bulunamadı."
-    except:
-        return "Hava durumu alınamadı."
+            feels_like = res["main"]["feels_like"]
+            desc = res["weather"][0]["description"].capitalize()
+            humidity = res["main"]["humidity"]
+            wind_speed = res["wind"]["speed"] if "wind" in res else "bilinmiyor"
+            
+            return (f"🌤️ {sehir.title()} için hava durumu:\n"
+                   f"• Sıcaklık: {temp:.1f}°C (Hissedilen: {feels_like:.1f}°C)\n"
+                   f"• Durum: {desc}\n"
+                   f"• Nem: %{humidity}\n"
+                   f"• Rüzgar: {wind_speed} m/s")
+        else:
+            return f"❌ {sehir.title()} için hava durumu bilgisi bulunamadı."
+    except Exception as e:
+        print(f"Hava durumu hatası: {e}")
+        return "🌫️ Hava durumu bilgisi alınamadı. Lütfen daha sonra tekrar deneyin."
 
 def mesajdaki_sehir(mesaj):
-    mesaj_norm = re.sub(r'[^\w\s]','', mesaj.lower())
+    """Geliştirilmiş şehir tespiti"""
+    mesaj_lower = mesaj.lower()
+    
+    # Önce tam eşleşme kontrolü
     for city in TURKISH_CITIES:
-        if re.search(r'\b'+re.escape(city)+r'\b', mesaj_norm):
+        if city in mesaj_lower:
             return city
+    
+    # Sonra kelime bazlı arama
+    words = re.findall(r'\b\w+\b', mesaj_lower)
+    for word in words:
+        if word in TURKISH_CITIES:
+            return word
+    
     return None
 
 # -----------------------------
@@ -181,56 +185,106 @@ def mesajdaki_sehir(mesaj):
 # -----------------------------
 def get_time_info():
     now = datetime.now()
+    days = {
+        "Monday": "Pazartesi", "Tuesday": "Salı", "Wednesday": "Çarşamba",
+        "Thursday": "Perşembe", "Friday": "Cuma", "Saturday": "Cumartesi",
+        "Sunday": "Pazar"
+    }
+    months = {
+        "January": "Ocak", "February": "Şubat", "March": "Mart",
+        "April": "Nisan", "May": "Mayıs", "June": "Haziran",
+        "July": "Temmuz", "August": "Ağustos", "September": "Eylül",
+        "October": "Ekim", "November": "Kasım", "December": "Aralık"
+    }
+    
+    day_en = now.strftime("%A")
+    month_en = now.strftime("%B")
+    
     return {
         "time": now.strftime("%H:%M"),
-        "date": now.strftime("%d %B %Y"),
-        "day": now.strftime("%A")
+        "date": f"{now.strftime('%d')} {months.get(month_en, month_en)} {now.strftime('%Y')}",
+        "day": days.get(day_en, day_en)
     }
 
 # -----------------------------
-# Wikipedia araştırma
+# Geliştirilmiş Wikipedia araştırma
 # -----------------------------
 def wiki_ara(konu):
     try:
-        headers = {"User-Agent": "MeldraBot/1.0"}
-        search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json"
-        res = requests.get(search_url, headers=headers, timeout=10).json()
-        results = res.get("query", {}).get("search", [])
+        headers = {"User-Agent": "MeldraBot/1.0 (https://github.com/your-repo; your-email@example.com)"}
+        
+        # Önce arama yap
+        search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json&srlimit=3"
+        search_res = requests.get(search_url, headers=headers, timeout=10).json()
+        
+        results = search_res.get("query", {}).get("search", [])
         if not results:
             return None
+        
+        # İlk sonucun özetini al
         title = results[0]["title"]
         summary_url = f"https://tr.wikipedia.org/api/rest_v1/page/summary/{quote(title)}"
         summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
-        return summary_res.get("extract")
-    except:
+        
+        extract = summary_res.get("extract")
+        if extract and len(extract) > 200:
+            # Metni kısalt ve anlamlı bir yerde kes
+            extract = extract[:400] + "..."
+        
+        return extract
+    except Exception as e:
+        print(f"Wikipedia hatası: {e}")
         return None
 
 # -----------------------------
-# DuckDuckGo API
+# Geliştirilmiş Web Arama
 # -----------------------------
 def web_ara(konu):
     try:
-        url = f"https://api.duckduckgo.com/?q={quote(konu)}&format=json&lang=tr"
+        url = f"https://api.duckduckgo.com/?q={quote(konu)}&format=json&no_html=1&skip_disambig=1&lang=tr"
         r = requests.get(url, timeout=8).json()
-        text = r.get("AbstractText") or r.get("Heading")
-        if text:
-            return text
-    except:
-        return None
+        
+        # Önce AbstractText'i kontrol et
+        abstract = r.get("AbstractText")
+        if abstract and abstract.strip():
+            return abstract
+        
+        # Sonra Heading'i kontrol et
+        heading = r.get("Heading")
+        if heading and heading.strip():
+            return heading
+            
+        # Son olarak Answer'ı kontrol et
+        answer = r.get("Answer")
+        if answer and answer.strip():
+            return answer
+            
+    except Exception as e:
+        print(f"Web arama hatası: {e}")
+    
     return None
 
 # -----------------------------
-# Yemek tarifleri
+# Geliştirilmiş Yemek Tarifleri
 # -----------------------------
 def yemek_tarifi(konu):
     konu_lower = konu.lower()
-    for key in FALLBACK_RECIPES:
+    
+    # Anahtar kelime eşleştirme
+    for key, recipe in FALLBACK_RECIPES.items():
         if key in konu_lower:
-            return FALLBACK_RECIPES[key]
+            return recipe
+    
+    # Benzer kelime arama
+    for key, recipe in FALLBACK_RECIPES.items():
+        if benzer_mi(key, konu_lower, 0.6):
+            return recipe
+    
     return None
 
 def tarif_var_mi(mesaj):
-    return any(x in mesaj.lower() for x in ["tarifi","nasıl yapılır","yapımı","tarif"])
+    yemek_anahtar_kelimeler = ["tarifi", "nasıl yapılır", "yapımı", "tarif", "yemek", "yemeği", "nasıl pişirilir"]
+    return any(x in mesaj.lower() for x in yemek_anahtar_kelimeler)
 
 # -----------------------------
 # Hatırlatıcı Sistemi
@@ -242,7 +296,7 @@ def set_reminder(user_id, reminder_text, minutes):
     if user_id not in reminders:
         reminders[user_id] = []
     reminders[user_id].append({"text": reminder_text, "time": reminder_time})
-    return f"⏰ Hatırlatıcı ayarlandı: {minutes} dakika sonra"
+    return f"⏰ Hatırlatıcı ayarlandı: '{reminder_text}' {minutes} dakika sonra"
 
 def check_reminders(user_id):
     if user_id not in reminders:
@@ -269,6 +323,8 @@ def get_joke():
         "Neden tavuklar karşıdan karşıya geçer? Cevabı bilmiyorum, ben yapay zekayım!",
         "Matematik kitabı neden üzgün? Çünkü çok fazla problemi var!",
         "Bir yapay zeka diğerine ne demiş? 1011001 0101100 0110101!",
+        "Neden bilgisayar doktora gitmiş? Çünkü virüs kapmış!",
+        "En hızlı yemek hangisidir? Şipşak makarna!"
     ]
     return random.choice(jokes)
 
@@ -277,11 +333,13 @@ def get_quote():
         "Hayatta en hakiki mürşit ilimdir. - Mustafa Kemal Atatürk",
         "Başarı, %1 ilham ve %99 terdir. - Thomas Edison",
         "Yapay zeka insanlığın en iyi yardımcısı olabilir.",
+        "Bilgi, güçtür. - Francis Bacon",
+        "En büyük savaş, cahilliğe karşı yapılan savaştır. - Mustafa Kemal Atatürk"
     ]
     return random.choice(quotes)
 
 # -----------------------------
-# Cevap motoru - GELİŞTİRİLMİŞ
+# Geliştirilmiş Cevap Motoru
 # -----------------------------
 def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
@@ -295,98 +353,126 @@ def cevap_ver(mesaj, user_id="default"):
         return reminder_text
 
     # Kral modu
-    if mesaj_lc=="her biji amasya":
+    if mesaj_lc == "her biji amasya":
         password_pending.add(user_id)
         return "Parolayı giriniz:"
+    
     if user_id in password_pending:
-        if mesaj_lc=="0567995561":
+        if mesaj_lc == "0567995561":
             password_pending.discard(user_id)
             king_mode.add(user_id)
             return "✅ Öğrenme modu aktif."
         else:
             password_pending.discard(user_id)
             return "⛔ Yanlış parola."
-    if mesaj_lc in ["ben yüce kral melih çakar","ben yuce kral melih cakar"]:
+    
+    if mesaj_lc in ["ben yüce kral melih çakar", "ben yuce kral melih cakar"]:
         king_mode.add(user_id)
         return "👑 Öğrenme modu aktif!"
+    
     if user_id in king_mode and mesaj_lc.startswith("soru:") and "cevap:" in mesaj_lc:
         try:
-            soru = mesaj_lc.split("soru:",1)[1].split("cevap:",1)[0].strip()
-            cevap = mesaj_lc.split("cevap:",1)[1].strip()
+            parts = mesaj_lc.split("soru:", 1)[1].split("cevap:", 1)
+            soru = parts[0].strip()
+            cevap = parts[1].strip()
+            
             if soru and cevap:
                 nlp_data_local = load_json(NLP_FILE)
-                nlp_data_local.append({"triggers":[soru], "responses":[cevap]})
+                # Aynı soru zaten var mı kontrol et
+                for item in nlp_data_local:
+                    if soru in item.get("triggers", []):
+                        item["responses"].append(cevap)
+                        break
+                else:
+                    nlp_data_local.append({"triggers": [soru], "responses": [cevap]})
+                
                 save_json(NLP_FILE, nlp_data_local)
                 global nlp_data
                 nlp_data = nlp_data_local
                 kaydet_context(user_id, soru, cevap)
-                return f"✅ '{soru}' sorusunu öğrendim."
-        except:
-            return "⚠️ Hatalı format."
+                return f"✅ '{soru}' sorusunu öğrendim. Cevap: {cevap}"
+        except Exception as e:
+            return "⚠️ Hatalı format. Doğru format: soru: [sorunuz] cevap: [cevabınız]"
 
-    if "öğret" in mesaj_lc: 
-        return "🤖 Sadece kral öğretebilir."
+    if "öğret" in mesaj_lc and user_id not in king_mode:
+        return "🤖 Sadece kral öğretebilir. Kral modu için: 'Ben yüce kral Melih Çakar'"
 
     # Zaman ve tarih sorguları
-    if any(x in mesaj_lc for x in ["saat kaç", "saat ne", "zaman"]):
+    if any(x in mesaj_lc for x in ["saat kaç", "saat ne", "zaman", "tarih", "gün"]):
         time_info = get_time_info()
         cevap = f"🕒 Şu an saat {time_info['time']}, {time_info['date']} {time_info['day']}"
         kaydet_context(user_id, mesaj_raw, cevap)
         return cevap
 
     # Eğlence özellikleri
-    if any(x in mesaj_lc for x in ["şaka yap", "şaka söyle", "güldür"]):
+    if any(x in mesaj_lc for x in ["şaka yap", "şaka söyle", "güldür", "komik", "eğlence"]):
         joke = get_joke()
         kaydet_context(user_id, mesaj_raw, joke)
         return joke
 
-    if any(x in mesaj_lc for x in ["alıntı", "quote", "söz"]):
+    if any(x in mesaj_lc for x in ["alıntı", "quote", "söz", "özdeyiş"]):
         quote = get_quote()
         kaydet_context(user_id, mesaj_raw, quote)
         return quote
 
     # Hatırlatıcı
-    if "hatırlatıcı" in mesaj_lc or "hatırlat" in mesaj_lc:
-        match = re.search(r'(\d+)\s*dakika?\s*sonra\s*(.+)', mesaj_lc)
-        if match:
-            minutes = int(match.group(1))
-            reminder_text = match.group(2)
-            cevap = set_reminder(user_id, reminder_text, minutes)
+    if any(x in mesaj_lc for x in ["hatırlatıcı", "hatırlat", "unutma"]):
+        # Farklı formatları yakala
+        patterns = [
+            r'(\d+)\s*dakika?\s*sonra\s*(.+)',
+            r'(\d+)\s*dk\s*sonra\s*(.+)',
+            r'(\d+)\s*dk\s*(.+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, mesaj_lc)
+            if match:
+                minutes = int(match.group(1))
+                reminder_text = match.group(2).strip()
+                cevap = set_reminder(user_id, reminder_text, minutes)
+                kaydet_context(user_id, mesaj_raw, cevap)
+                return cevap
+        
+        return "⏰ Hatırlatıcı formatı: '30 dakika sonra egzersiz yap' şeklinde olmalı."
+
+    # Hava durumu sorguları - ÖNCELİKLİ
+    if any(x in mesaj_lc for x in ["hava durumu", "hava", "derece", "kaç derece", "havası"]):
+        city = mesajdaki_sehir(mesaj_raw)
+        if city:
+            cevap = hava_durumu(city)
+            kaydet_context(user_id, mesaj_raw, cevap)
+            return cevap
+        else:
+            cevap = "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz?"
             kaydet_context(user_id, mesaj_raw, cevap)
             return cevap
 
-    # NLP
-    nlp_resp = nlp_cevap(mesaj_raw)
-    if nlp_resp:
-        kaydet_context(user_id, mesaj_raw, nlp_resp)
-        return nlp_resp
+    # Yemek tarifi - ÖNCELİKLİ
+    if tarif_var_mi(mesaj_raw):
+        # Yemek adını çıkar
+        konu = re.sub(r'(tarifi|nasıl yapılır|yapımı|tarif|yemek|yemeği|nasıl pişirilir)', '', mesaj_raw, flags=re.IGNORECASE).strip()
+        tarif = yemek_tarifi(konu)
+        if tarif:
+            kaydet_context(user_id, mesaj_raw, tarif)
+            return tarif
+        else:
+            cevap = f"🍳 '{konu}' için henüz tarifim yok. Şu yemeklerin tarifini biliyorum: {', '.join(FALLBACK_RECIPES.keys())}"
+            kaydet_context(user_id, mesaj_raw, cevap)
+            return cevap
 
     # Matematik
-    mat_text = kelime_sayiyi_rakamla(mesaj_raw).replace("x","*")
+    mat_text = kelime_sayiyi_rakamla(mesaj_raw).replace("x", "*")
     mat_res = hesapla(mat_text)
     if mat_res is not None:
         cevap = f"🧮 Cevap: {mat_res}"
         kaydet_context(user_id, mesaj_raw, cevap)
         return cevap
 
-    # Hava durumu
-    city = mesajdaki_sehir(mesaj_raw)
-    if city: 
-        cevap = hava_durumu(city)
-        kaydet_context(user_id, mesaj_raw, cevap)
-        return cevap
-
-    # Yemek tarifi
-    if tarif_var_mi(mesaj_raw):
-        konu = re.sub(r'(tarifi|nasıl yapılır|yapımı|tarif)', '', mesaj_raw, flags=re.IGNORECASE).strip()
-        tarif = yemek_tarifi(konu)
-        if tarif:
-            kaydet_context(user_id, mesaj_raw, tarif)
-            return tarif
-        else:
-            cevap = f"'{konu}' için tarif bulunamadı."
-            kaydet_context(user_id, mesaj_raw, cevap)
-            return cevap
+    # NLP
+    nlp_resp = nlp_cevap(mesaj_raw)
+    if nlp_resp:
+        kaydet_context(user_id, mesaj_raw, nlp_resp)
+        return nlp_resp
 
     # Wikipedia
     wiki_sonuc = wiki_ara(mesaj_raw)
@@ -402,15 +488,16 @@ def cevap_ver(mesaj, user_id="default"):
 
     fallback = random.choice([
         "Bunu anlamadım, tekrar sorabilir misin?",
-        "Henüz bu soruyu bilmiyorum. (Sadece kral modu ile öğretilebilir.)",
+        "Henüz bu soruyu bilmiyorum. Kral modu ile bana öğretebilirsin!",
         "Bu konuda yardımcı olamıyorum, başka bir şey sorabilir misin?",
-        "Sanırım bu soruyu anlamadım, daha basit şekilde sorar mısın?"
+        "Sanırım bu soruyu anlamadım, daha basit şekilde sorar mısın?",
+        "Bu soru için henüz bir cevabım yok. Kral modunda 'soru: [sorunuz] cevap: [cevabınız]' formatıyla öğretebilirsin!"
     ])
     kaydet_context(user_id, mesaj_raw, fallback)
     return fallback
 
 # -----------------------------
-# Web arayüzü - GELİŞTİRİLMİŞ
+# Web arayüzü
 # -----------------------------
 @app.route("/")
 def index():
@@ -446,15 +533,21 @@ def index():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json(force=True)
-    mesaj = data.get("mesaj","")
-    user_id = data.get("user_id","default")
-    cevap = cevap_ver(mesaj, user_id)
-    return jsonify({"cevap": cevap})
+    try:
+        data = request.get_json(force=True)
+        mesaj = data.get("mesaj", "")
+        user_id = data.get("user_id", "default")
+        
+        if not mesaj or not mesaj.strip():
+            return jsonify({"cevap": "Lütfen bir mesaj girin."})
+        
+        cevap = cevap_ver(mesaj, user_id)
+        return jsonify({"cevap": cevap})
+    except Exception as e:
+        return jsonify({"cevap": f"Bir hata oluştu: {str(e)}"})
 
 @app.route("/speech_chat", methods=["POST"])
 def speech_chat():
-    """Sesli sohbet endpoint'i - Render için devre dışı"""
     return jsonify({
         "error": "Ses özellikleri Render'da devre dışı bırakıldı",
         "orjinal_metin": "",
@@ -463,7 +556,6 @@ def speech_chat():
 
 @app.route("/tts", methods=["POST"])
 def text_to_speech_api():
-    """Metni sese dönüştürme endpoint'i - Render için devre dışı"""
     return jsonify({"error": "Ses özellikleri Render'da devre dışı bırakıldı"}), 503
 
 @app.route("/_nlp_dump", methods=["GET"])
@@ -472,7 +564,6 @@ def nlp_dump():
 
 @app.route("/features", methods=["GET"])
 def features():
-    """Mevcut özellikleri listele"""
     features_list = [
         "🤖 Akıllı sohbet",
         "🔢 Matematik hesaplamaları", 
@@ -487,8 +578,9 @@ def features():
     ]
     return jsonify({"features": features_list})
 
-if __name__=="__main__":
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"MELDRA AI {port} portunda başlatılıyor...")
-    print("Ses özellikleri: DEVRE DIŞI (Render uyumluluğu)")
+    print(f"🚀 MELDRA AI {port} portunda başlatılıyor...")
+    print("🔊 Ses özellikleri: DEVRE DIŞI (Render uyumluluğu)")
+    print("📚 Mevcut yemek tarifleri:", ", ".join(FALLBACK_RECIPES.keys()))
     app.run(host="0.0.0.0", port=port, debug=False)
