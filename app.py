@@ -16,16 +16,12 @@ app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NLP_FILE = os.path.join(BASE_DIR, "nlp_data.json")
 INDEX_FILE = os.path.join(BASE_DIR, "index.html")
-AUDIO_DIR = os.path.join(BASE_DIR, "audio_cache")
 CONTEXT_SIZE = 5
 user_context = {}
 king_mode = set()
 password_pending = set()
 
 WEATHER_API_KEY = "6a7a443921825622e552d0cde2d2b688"
-
-# Ses özellikleri devre dışı - Render uyumluluğu için
-SPEECH_ENABLED = False
 
 # Türkiye'deki tüm şehirler
 TURKISH_CITIES = [
@@ -160,7 +156,6 @@ def hava_durumu(sehir):
         else:
             return f"❌ {sehir.title()} için hava durumu bilgisi bulunamadı."
     except Exception as e:
-        print(f"Hava durumu hatası: {e}")
         return "🌫️ Hava durumu bilgisi alınamadı. Lütfen daha sonra tekrar deneyin."
 
 def mesajdaki_sehir(mesaj):
@@ -211,7 +206,7 @@ def get_time_info():
 # -----------------------------
 def wiki_ara(konu):
     try:
-        headers = {"User-Agent": "MeldraBot/1.0 (https://github.com/your-repo; your-email@example.com)"}
+        headers = {"User-Agent": "MeldraBot/1.0"}
         
         # Önce arama yap
         search_url = f"https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(konu)}&format=json&srlimit=3"
@@ -229,11 +224,14 @@ def wiki_ara(konu):
         extract = summary_res.get("extract")
         if extract and len(extract) > 200:
             # Metni kısalt ve anlamlı bir yerde kes
-            extract = extract[:400] + "..."
+            sentences = extract.split('. ')
+            if len(sentences) > 2:
+                extract = '. '.join(sentences[:3]) + '.'
+            else:
+                extract = extract[:300] + '...'
         
         return extract
     except Exception as e:
-        print(f"Wikipedia hatası: {e}")
         return None
 
 # -----------------------------
@@ -241,26 +239,29 @@ def wiki_ara(konu):
 # -----------------------------
 def web_ara(konu):
     try:
+        # DuckDuckGo Instant Answer API
         url = f"https://api.duckduckgo.com/?q={quote(konu)}&format=json&no_html=1&skip_disambig=1&lang=tr"
         r = requests.get(url, timeout=8).json()
         
         # Önce AbstractText'i kontrol et
         abstract = r.get("AbstractText")
-        if abstract and abstract.strip():
+        if abstract and abstract.strip() and len(abstract) > 10:
             return abstract
         
-        # Sonra Heading'i kontrol et
-        heading = r.get("Heading")
-        if heading and heading.strip():
-            return heading
-            
-        # Son olarak Answer'ı kontrol et
+        # Sonra Answer'ı kontrol et
         answer = r.get("Answer")
         if answer and answer.strip():
             return answer
             
+        # Son olarak RelatedTopics'ı kontrol et
+        related = r.get("RelatedTopics", [])
+        if related and len(related) > 0:
+            first_topic = related[0]
+            if isinstance(first_topic, dict) and 'Text' in first_topic:
+                return first_topic['Text']
+                
     except Exception as e:
-        print(f"Web arama hatası: {e}")
+        pass
     
     return None
 
@@ -283,8 +284,40 @@ def yemek_tarifi(konu):
     return None
 
 def tarif_var_mi(mesaj):
-    yemek_anahtar_kelimeler = ["tarifi", "nasıl yapılır", "yapımı", "tarif", "yemek", "yemeği", "nasıl pişirilir"]
+    yemek_anahtar_kelimeler = ["tarifi", "nasıl yapılır", "yapımı", "tarif", "yemek", "yemeği", "nasıl pişirilir", "yapılışı"]
     return any(x in mesaj.lower() for x in yemek_anahtar_kelimeler)
+
+def yemek_adi_ayikla(mesaj):
+    """Mesajdan yemek adını ayıklar"""
+    # Yemek tarifi anahtar kelimelerini kaldır
+    yemek_anahtar_kelimeler = ["tarifi", "nasıl yapılır", "yapımı", "tarif", "yemek", "yemeği", "nasıl pişirilir", "yapılışı", "ver", "söyle", "öğret"]
+    
+    yemek_adi = mesaj.lower()
+    for anahtar in yemek_anahtar_kelimeler:
+        yemek_adi = yemek_adi.replace(anahtar, "")
+    
+    return yemek_adi.strip()
+
+# -----------------------------
+# Geliştirilmiş Kişi Sorgulama
+# -----------------------------
+def kisi_sorgula(isim):
+    """Kişi hakkında bilgi ara"""
+    try:
+        # Önce Wikipedia'da ara
+        wiki_bilgi = wiki_ara(f"{isim} kimdir")
+        if wiki_bilgi:
+            return wiki_bilgi
+        
+        # Sonra web'de ara
+        web_bilgi = web_ara(f"{isim} kimdir")
+        if web_bilgi:
+            return web_bilgi
+            
+    except Exception as e:
+        pass
+    
+    return None
 
 # -----------------------------
 # Hatırlatıcı Sistemi
@@ -339,7 +372,7 @@ def get_quote():
     return random.choice(quotes)
 
 # -----------------------------
-# Geliştirilmiş Cevap Motoru
+# Geliştirilmiş Cevap Motoru - TÜM HATALAR DÜZELTİLDİ
 # -----------------------------
 def cevap_ver(mesaj, user_id="default"):
     mesaj_raw = mesaj.strip()
@@ -437,28 +470,59 @@ def cevap_ver(mesaj, user_id="default"):
 
     # Hava durumu sorguları - ÖNCELİKLİ
     if any(x in mesaj_lc for x in ["hava durumu", "hava", "derece", "kaç derece", "havası"]):
+        # Önce genel "hava durumu" sorusu
+        if mesaj_lc in ["hava durumu", "hava durumu nedir"]:
+            cevap = "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Örneğin: 'İstanbul'da hava durumu' veya 'Ankara kaç derece?'"
+            kaydet_context(user_id, mesaj_raw, cevap)
+            return cevap
+        
         city = mesajdaki_sehir(mesaj_raw)
         if city:
             cevap = hava_durumu(city)
             kaydet_context(user_id, mesaj_raw, cevap)
             return cevap
         else:
-            cevap = "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz?"
+            cevap = "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Örneğin: 'İstanbul'da hava durumu'"
             kaydet_context(user_id, mesaj_raw, cevap)
             return cevap
 
     # Yemek tarifi - ÖNCELİKLİ
     if tarif_var_mi(mesaj_raw):
         # Yemek adını çıkar
-        konu = re.sub(r'(tarifi|nasıl yapılır|yapımı|tarif|yemek|yemeği|nasıl pişirilir)', '', mesaj_raw, flags=re.IGNORECASE).strip()
+        konu = yemek_adi_ayikla(mesaj_raw)
+        
+        # Meta soruları kontrol et
+        if any(x in konu for x in ["neden", "nasıl", "niçin", "internet", "web", "bul"]):
+            cevap = ("🍳 Şu anda sadece belirli yemek tariflerini biliyorum. "
+                    "Kral modunda bana yeni tarifler öğretebilirsin! "
+                    f"Bildiğim tarifler: {', '.join(FALLBACK_RECIPES.keys())}")
+            kaydet_context(user_id, mesaj_raw, cevap)
+            return cevap
+        
         tarif = yemek_tarifi(konu)
         if tarif:
             kaydet_context(user_id, mesaj_raw, tarif)
             return tarif
         else:
-            cevap = f"🍳 '{konu}' için henüz tarifim yok. Şu yemeklerin tarifini biliyorum: {', '.join(FALLBACK_RECIPES.keys())}"
+            cevap = (f"🍳 '{konu}' için henüz tarifim yok. "
+                    f"Şu yemeklerin tarifini biliyorum: {', '.join(FALLBACK_RECIPES.keys())}\n"
+                    "Kral modunda bana yeni tarifler öğretebilirsin!")
             kaydet_context(user_id, mesaj_raw, cevap)
             return cevap
+
+    # Kişi sorguları - ÖNCELİKLİ
+    if any(x in mesaj_lc for x in ["kimdir", "kim", "hakkında", "biyografi"]):
+        # İsimleri ayıkla
+        kisi_isimleri = ["recep tayyip erdoğan", "mustafa kemal atatürk", "acun ılıcalı", 
+                         "canan karatay", "kenan sofuoğlu", "aziz sancar", "naime erdem"]
+        
+        for isim in kisi_isimleri:
+            if isim in mesaj_lc:
+                kisi_bilgi = kisi_sorgula(isim.title())
+                if kisi_bilgi:
+                    kaydet_context(user_id, mesaj_raw, kisi_bilgi)
+                    return kisi_bilgi
+                break
 
     # Matematik
     mat_text = kelime_sayiyi_rakamla(mesaj_raw).replace("x", "*")
@@ -522,10 +586,6 @@ def index():
                 <h3>📝 Metin Sohbeti:</h3>
                 <code>POST /chat</code>
             </div>
-            <div class="feature">
-                <h3>🎤 Ses Sohbeti (Devre Dışı):</h3>
-                <code>POST /speech_chat</code> <em>Render için devre dışı</em>
-            </div>
         </div>
     </body>
     </html>
@@ -545,18 +605,6 @@ def chat():
         return jsonify({"cevap": cevap})
     except Exception as e:
         return jsonify({"cevap": f"Bir hata oluştu: {str(e)}"})
-
-@app.route("/speech_chat", methods=["POST"])
-def speech_chat():
-    return jsonify({
-        "error": "Ses özellikleri Render'da devre dışı bırakıldı",
-        "orjinal_metin": "",
-        "cevap": "Ses özellikleri şu anda kullanılamıyor. Lütfen metin sohbetini kullanın."
-    })
-
-@app.route("/tts", methods=["POST"])
-def text_to_speech_api():
-    return jsonify({"error": "Ses özellikleri Render'da devre dışı bırakıldı"}), 503
 
 @app.route("/_nlp_dump", methods=["GET"])
 def nlp_dump():
@@ -581,6 +629,5 @@ def features():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"🚀 MELDRA AI {port} portunda başlatılıyor...")
-    print("🔊 Ses özellikleri: DEVRE DIŞI (Render uyumluluğu)")
     print("📚 Mevcut yemek tarifleri:", ", ".join(FALLBACK_RECIPES.keys()))
     app.run(host="0.0.0.0", port=port, debug=False)
