@@ -6,10 +6,12 @@ gunicorn
 SpeechRecognition
 gTTS 
 pydub
+pygame
 
 Flask==3.1.2
 requests==2.32.5
 beautifulsoup4==4.14.2
 lxml==6.0.2
 gunicorn==20.1.0
+
 
