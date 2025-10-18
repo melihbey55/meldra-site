@@ -48,19 +48,39 @@ FALLBACK_RECIPES = {
     "kek": "🧁 Kek tarifi: 3 yumurta, 1 su bardağı şeker çırpılır. 1 su bardağı süt, 1 su bardağı sıvı yağ, 3 su bardağı un, 1 paket kabartma tozu eklenir. 180°C fırında 40 dakika pişirilir."
 }
 
-# JSON dosyası yoksa oluştur
+# Önceden tanımlanmış NLP verileri (hata önleme için)
+DEFAULT_NLP_DATA = [
+    {
+        "triggers": ["merhaba", "selam", "hey", "hi", "hello"],
+        "responses": ["Merhaba! Size nasıl yardımcı olabilirim?", "Selam! Nasılsınız?", "Hey! İyi misin?"]
+    },
+    {
+        "triggers": ["nasılsın", "ne haber", "iyi misin"],
+        "responses": ["Teşekkürler, iyiyim! Siz nasılsınız?", "Harika hissediyorum, ya siz?", "İyiyim, size nasıl yardımcı olabilirim?"]
+    },
+    {
+        "triggers": ["teşekkür", "sağ ol", "thanks"],
+        "responses": ["Rica ederim!", "Ne demek, her zaman!", "Size yardımcı olabildiğim için mutluyum!"]
+    }
+]
+
+# JSON dosyası yoksa veya boşsa oluştur
 if not os.path.exists(NLP_FILE):
     with open(NLP_FILE, "w", encoding="utf-8") as f:
-        json.dump([], f, ensure_ascii=False, indent=2)
+        json.dump(DEFAULT_NLP_DATA, f, ensure_ascii=False, indent=2)
 
 # -----------------------------
 # JSON işlemleri
 # -----------------------------
 def load_json(file):
-    if not os.path.exists(file): return []
+    if not os.path.exists(file): 
+        return DEFAULT_NLP_DATA
     with open(file, "r", encoding="utf-8") as f:
-        try: return json.load(f)
-        except json.JSONDecodeError: return []
+        try: 
+            data = json.load(f)
+            return data if data else DEFAULT_NLP_DATA
+        except json.JSONDecodeError: 
+            return DEFAULT_NLP_DATA
 
 def save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
@@ -119,10 +139,28 @@ def token_word_in_text(token, text):
 def nlp_cevap(mesaj):
     temiz = re.sub(r'[^\w\s]','', (mesaj or "").lower()).strip()
     if not temiz: return None
+    
+    # Öncelikle tam eşleşmeleri kontrol et
     for item in nlp_data:
         for trig in item.get("triggers", []):
-            if trig.strip().lower() == temiz or token_word_in_text(trig.lower(), temiz) or benzer_mi(trig.lower(), temiz):
+            trig_clean = trig.strip().lower()
+            if trig_clean == temiz:
                 return random.choice(item.get("responses", ["Hmm, anladım."]))
+    
+    # Sonra kelime bazlı arama
+    for item in nlp_data:
+        for trig in item.get("triggers", []):
+            trig_clean = trig.strip().lower()
+            if token_word_in_text(trig_clean, temiz):
+                return random.choice(item.get("responses", ["Hmm, anladım."]))
+    
+    # En son benzerlik kontrolü
+    for item in nlp_data:
+        for trig in item.get("triggers", []):
+            trig_clean = trig.strip().lower()
+            if benzer_mi(trig_clean, temiz, 0.8):
+                return random.choice(item.get("responses", ["Hmm, anladım."]))
+    
     return None
 
 # -----------------------------
@@ -132,6 +170,12 @@ def kaydet_context(user_id, mesaj, cevap):
     if user_id not in user_context:
         user_context[user_id] = deque(maxlen=CONTEXT_SIZE)
     user_context[user_id].append({"mesaj": mesaj, "cevap": cevap})
+
+def get_son_context(user_id, n=1):
+    """Son n context'i getir"""
+    if user_id not in user_context or len(user_context[user_id]) < n:
+        return []
+    return list(user_context[user_id])[-n:]
 
 # -----------------------------
 # Geliştirilmiş Hava Durumu
@@ -164,7 +208,7 @@ def mesajdaki_sehir(mesaj):
     
     # Önce tam eşleşme kontrolü
     for city in TURKISH_CITIES:
-        if city in mesaj_lower:
+        if city == mesaj_lower:
             return city
     
     # Sonra kelime bazlı arama
@@ -372,21 +416,34 @@ def get_quote():
     return random.choice(quotes)
 
 # -----------------------------
-# Context Tabanlı Hava Durumu
+# Akıllı Context Yönetimi
 # -----------------------------
 def is_hava_durumu_context(user_id, mesaj):
     """Context'e göre hava durumu sorgusu olup olmadığını kontrol et"""
-    if user_id not in user_context or not user_context[user_id]:
+    son_context = get_son_context(user_id, 2)  # Son 2 mesaja bak
+    
+    for ctx in son_context:
+        if any(kelime in ctx["mesaj"].lower() for kelime in ["hava durumu", "hava", "derece", "kaç derece", "havası", "nem", "rüzgar"]):
+            return True
+    
+    # Mevcut mesajda şehir varsa ve önceki context hava durumu ile ilgiliyse
+    if mesajdaki_sehir(mesaj) and son_context:
+        son_mesaj = son_context[-1]["mesaj"].lower()
+        if any(kelime in son_mesaj for kelime in ["hava durumu", "hava", "derece"]):
+            return True
+    
+    return False
+
+def should_show_city_info(user_id, mesaj):
+    """Şehir bilgisi göstermeli mi?"""
+    # Eğer hava durumu context'i varsa, şehir bilgisi gösterme
+    if is_hava_durumu_context(user_id, mesaj):
         return False
     
-    son_mesajlar = [ctx["mesaj"].lower() for ctx in list(user_context[user_id])[-2:]]
-    
-    # Son mesajlarda hava durumu ile ilgili kelimeler var mı?
-    hava_kelimeleri = ["hava durumu", "hava", "derece", "kaç derece", "havası", "nem", "rüzgar"]
-    
-    for mesaj in son_mesajlar + [mesaj.lower()]:
-        if any(kelime in mesaj for kelime in hava_kelimeleri):
-            return True
+    # Sadece şehir ismi yazılmışsa ve context yoksa şehir bilgisi göster
+    city = mesajdaki_sehir(mesaj)
+    if city and city == mesaj.lower().strip():
+        return True
     
     return False
 
@@ -487,7 +544,7 @@ def cevap_ver(mesaj, user_id="default"):
         
         return "⏰ Hatırlatıcı formatı: '30 dakika sonra egzersiz yap' şeklinde olmalı."
 
-    # Hava durumu sorguları - CONTEXT DÜZELTMESİ
+    # Hava durumu sorguları - AKILLI CONTEXT YÖNETİMİ
     if any(x in mesaj_lc for x in ["hava durumu", "hava", "derece", "kaç derece", "havası"]) or is_hava_durumu_context(user_id, mesaj_lc):
         # Önce genel "hava durumu" sorusu
         if mesaj_lc in ["hava durumu", "hava durumu nedir"]:
@@ -506,9 +563,15 @@ def cevap_ver(mesaj, user_id="default"):
             cevap = "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz?"
             kaydet_context(user_id, mesaj_raw, cevap)
             return cevap
-        else:
-            # Şehir yoksa normal işleme devam et
-            pass
+
+    # Şehir bilgisi (yalnızca şehir ismi varsa ve hava durumu context'i yoksa)
+    if should_show_city_info(user_id, mesaj_raw):
+        city = mesajdaki_sehir(mesaj_raw)
+        if city:
+            wiki_sehir = wiki_ara(city)
+            if wiki_sehir:
+                kaydet_context(user_id, mesaj_raw, wiki_sehir)
+                return wiki_sehir
 
     # Yemek tarifi - ÖNCELİKLİ
     if tarif_var_mi(mesaj_raw):
@@ -563,15 +626,7 @@ def cevap_ver(mesaj, user_id="default"):
         kaydet_context(user_id, mesaj_raw, cevap)
         return cevap
 
-    # Şehir bilgisi (yalnızca şehir ismi varsa ve hava durumu context'i yoksa)
-    city = mesajdaki_sehir(mesaj_raw)
-    if city and not is_hava_durumu_context(user_id, mesaj_lc):
-        wiki_sehir = wiki_ara(city)
-        if wiki_sehir:
-            kaydet_context(user_id, mesaj_raw, wiki_sehir)
-            return wiki_sehir
-
-    # NLP
+    # NLP - Bu artık daha güvenli çünkü hatalı NLP verilerini temizledik
     nlp_resp = nlp_cevap(mesaj_raw)
     if nlp_resp:
         kaydet_context(user_id, mesaj_raw, nlp_resp)
@@ -669,4 +724,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"🚀 MELDRA AI {port} portunda başlatılıyor...")
     print("📚 Mevcut yemek tarifleri:", ", ".join(FALLBACK_RECIPES.keys()))
+    print("🔧 NLP verileri temizlendi ve optimize edildi")
     app.run(host="0.0.0.0", port=port, debug=False)
