@@ -38,10 +38,15 @@ INDEX_FILE = os.path.join(BASE_DIR, "index.html")
 # GLOBAL DEĞİŞKENLER VE VERİ YAPILARI
 # =============================
 
-# Kullanıcı durum yönetimi
+# Kullanıcı durum yönetimi - FIXED: Daha iyi state management
 user_context = defaultdict(lambda: deque(maxlen=10))
 conversation_history = defaultdict(lambda: deque(maxlen=20))
-user_states = defaultdict(dict)
+user_states = defaultdict(lambda: {
+    'waiting_for_city': False,
+    'last_intent': None,
+    'last_entities': {},
+    'conversation_topic': None
+})
 king_mode = set()
 password_pending = set()
 
@@ -104,7 +109,7 @@ INTELLIGENT_RECIPES = {
 }
 
 # =============================
-# İLERİ SEVİYE NLP MOTORU
+# İLERİ SEVİYE NLP MOTORU - FIXED
 # =============================
 
 class AdvancedNLU:
@@ -288,20 +293,20 @@ class AdvancedNLU:
         return entities
 
     def is_weather_follow_up(self, user_id: str, current_message: str) -> bool:
-        """Hava durumu takip sorusu mu kontrol eder"""
+        """Hava durumu takip sorusu mu kontrol eder - FIXED"""
         if user_id not in user_states:
             return False
         
         state = user_states[user_id]
+        
+        # Sadece waiting_for_city state'i True ise follow-up kabul et
         if state.get('waiting_for_city'):
             return True
         
-        # Son mesajlarda hava durumu konuşulmuş mu?
-        recent_messages = list(conversation_history[user_id])[-3:]
-        for msg in recent_messages:
-            if any(word in self.normalize_text(msg.get('content', '')) 
-                   for word in ['hava', 'derece', 'sıcaklık', 'nem']):
-                return True
+        # Teşekkür, selam gibi mesajları follow-up olarak kabul etme
+        current_intent, _ = self.extract_intent(current_message)
+        if current_intent in ['thanks', 'greeting']:
+            return False
         
         return False
 
@@ -450,7 +455,7 @@ class IntelligentAPI:
 api_client = IntelligentAPI()
 
 # =============================
-# AKILLI KONUŞMA YÖNETİCİSİ
+# AKILLI KONUŞMA YÖNETİCİSİ - FIXED
 # =============================
 
 class ConversationManager:
@@ -543,7 +548,7 @@ class MathEngine:
 math_engine = MathEngine()
 
 # =============================
-# ANA CEVAP ÜRETME MOTORU
+# ANA CEVAP ÜRETME MOTORU - FIXED
 # =============================
 
 class ResponseEngine:
@@ -567,7 +572,7 @@ class ResponseEngine:
         ]
 
     def generate_response(self, message: str, user_id: str = "default") -> str:
-        """Ana cevap üretme fonksiyonu"""
+        """Ana cevap üretme fonksiyonu - FIXED"""
         start_time = time.time()
         
         # Konuşma geçmişine kullanıcı mesajını ekle
@@ -579,18 +584,26 @@ class ResponseEngine:
         
         logger.info(f"NLU Analysis - Intent: {intent}, Confidence: {confidence:.2f}, Entities: {entities}")
         
+        # State güncelleme - FIXED: Daha iyi state management
+        current_state = user_states[user_id]
+        
+        # Teşekkür veya selam gibi mesajlarda waiting_for_city state'ini temizle
+        if intent in ['thanks', 'greeting']:
+            current_state['waiting_for_city'] = False
+        
         # Yüksek güvenilirlikli intent'ler için özel işlemler
-        if confidence > 0.8:
+        if confidence > 0.7:  # Threshold'u düşürdük
             response = self.handle_high_confidence_intent(intent, entities, message, user_id)
             if response:
                 self.finalize_response(user_id, response, start_time)
                 return response
         
         # Düşük güvenilirlik veya karmaşık sorular için OpenAI
-        ai_response = self.try_ai_generation(message, user_id, intent, entities)
-        if ai_response:
-            self.finalize_response(user_id, ai_response, start_time)
-            return ai_response
+        if confidence < 0.6 or intent == 'unknown':
+            ai_response = self.try_ai_generation(message, user_id, intent, entities)
+            if ai_response:
+                self.finalize_response(user_id, ai_response, start_time)
+                return ai_response
         
         # Fallback
         response = random.choice(self.fallback_responses)
@@ -598,52 +611,65 @@ class ResponseEngine:
         return response
 
     def handle_high_confidence_intent(self, intent: str, entities: Dict, message: str, user_id: str) -> Optional[str]:
-        """Yüksek güvenilirlikli intent'leri işler"""
+        """Yüksek güvenilirlikli intent'leri işler - FIXED"""
+        
+        current_state = user_states[user_id]
         
         if intent == 'greeting':
+            current_state['waiting_for_city'] = False
             return random.choice(self.greeting_responses)
         
         elif intent == 'thanks':
+            current_state['waiting_for_city'] = False
             return random.choice(self.thanks_responses)
         
         elif intent == 'weather':
             return self.handle_weather_intent(entities, user_id, message)
         
         elif intent == 'cooking':
+            current_state['waiting_for_city'] = False
             return self.handle_cooking_intent(entities, message)
         
         elif intent == 'math':
+            current_state['waiting_for_city'] = False
             return self.handle_math_intent(message)
         
         elif intent == 'person_query':
+            current_state['waiting_for_city'] = False
             return self.handle_person_query(entities, message)
         
         elif intent == 'time':
+            current_state['waiting_for_city'] = False
             return self.handle_time_query()
         
         elif intent == 'news':
+            current_state['waiting_for_city'] = False
             return self.handle_news_query(entities)
         
         return None
 
     def handle_weather_intent(self, entities: Dict, user_id: str, message: str) -> Optional[str]:
-        """Hava durumu sorgularını işler"""
+        """Hava durumu sorgularını işler - FIXED"""
+        current_state = user_states[user_id]
         city = entities.get('city')
         
+        # Eğer şehir varsa veya waiting state'inde değilsek normal işlem
         if city:
-            # Doğrudan şehir belirtilmişse
-            user_states[user_id].pop('waiting_for_city', None)
+            current_state['waiting_for_city'] = False
             return api_client.get_weather(city)
-        elif nlu_engine.is_weather_follow_up(user_id, message):
-            # Takip sorusuysa ve şehir bulunabilirse
-            for city in TURKISH_CITIES:
-                if city in nlu_engine.normalize_text(message):
-                    user_states[user_id].pop('waiting_for_city', None)
-                    return api_client.get_weather(city)
-        
-        # Şehir belirtilmemişse
-        user_states[user_id]['waiting_for_city'] = True
-        return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Örneğin: 'İstanbul hava durumu' veya 'Ankara kaç derece?'"
+        elif current_state.get('waiting_for_city'):
+            # Waiting state'inde isek ve mesajda şehir ara
+            for possible_city in TURKISH_CITIES:
+                if possible_city in nlu_engine.normalize_text(message):
+                    current_state['waiting_for_city'] = False
+                    return api_client.get_weather(possible_city)
+            
+            # Şehir bulunamazsa tekrar sor
+            return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Lütfen bir şehir ismi yazın."
+        else:
+            # Şehir belirtilmemişse state'i set et ve sor
+            current_state['waiting_for_city'] = True
+            return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Örneğin: 'İstanbul hava durumu' veya 'Ankara kaç derece?'"
 
     def handle_cooking_intent(self, entities: Dict, message: str) -> Optional[str]:
         """Yemek tarifi sorgularını işler"""
@@ -726,6 +752,10 @@ class ResponseEngine:
 
     def try_ai_generation(self, message: str, user_id: str, intent: str, entities: Dict) -> Optional[str]:
         """OpenAI ile akıllı cevap üretmeyi dener"""
+        # Waiting_for_city state'inde ise OpenAI'ı kullanma
+        if user_states[user_id].get('waiting_for_city'):
+            return None
+            
         context = conv_manager.get_recent_context(user_id, 3)
         conversation_summary = conv_manager.get_conversation_summary(user_id)
         
@@ -891,7 +921,7 @@ def index():
                 </div>
                 
                 <div class="feature-card">
-                    <h3>🍳 Akıllı Tarifler</h3>
+                    <h3>🍳 Akıllı Tarifers</h3>
                     <p>Detaylı yemek tarifleri ve malzeme listeleri</p>
                 </div>
                 
@@ -938,7 +968,7 @@ def chat():
 def status():
     return jsonify({
         "status": "active",
-        "version": "4.0.0",
+        "version": "4.0.1",
         "timestamp": datetime.now().isoformat(),
         "features": [
             "Advanced NLU Engine",
@@ -968,7 +998,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     
     print("🚀" * 60)
-    print("🚀 MELDRA AI ULTRA - Tüm Sistemler Aktif!")
+    print("🚀 MELDRA AI ULTRA v4.0.1 - Tüm Sistemler Aktif!")
     print("🚀 Port:", port)
     print("🚀 Özellikler:")
     print("🚀   • Gelişmiş NLU Motoru")
