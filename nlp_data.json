@@ -67,17 +67,6 @@
   },
   {
     "triggers": [
-      "hava nasıl",
-      "bugün hava",
-      "dışarısı nasıl"
-    ],
-    "responses": [
-      "Bunu bilmiyorum ama dışarı çıkıp görebilirsin!",
-      "Hava durumunu kontrol etmek için bir siteye bakabilirsin."
-    ]
-  },
-  {
-    "triggers": [
       "seviyor musun",
       "ne düşünüyorsun",
       "nasıl hissediyorsun"
@@ -680,4 +669,5 @@
   }
 
 ]
+
 
