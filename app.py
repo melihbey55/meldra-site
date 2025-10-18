@@ -222,13 +222,13 @@ def wiki_ara(konu):
         summary_res = requests.get(summary_url, headers=headers, timeout=10).json()
         
         extract = summary_res.get("extract")
-        if extract and len(extract) > 200:
+        if extract:
             # Metni kısalt ve anlamlı bir yerde kes
             sentences = extract.split('. ')
             if len(sentences) > 2:
-                extract = '. '.join(sentences[:3]) + '.'
+                extract = '. '.join(sentences[:2]) + '.'
             else:
-                extract = extract[:300] + '...'
+                extract = extract[:250] + '...' if len(extract) > 250 else extract
         
         return extract
     except Exception as e:
@@ -304,15 +304,15 @@ def yemek_adi_ayikla(mesaj):
 def kisi_sorgula(isim):
     """Kişi hakkında bilgi ara"""
     try:
-        # Önce Wikipedia'da ara
-        wiki_bilgi = wiki_ara(f"{isim} kimdir")
+        # Önce doğrudan kişi adıyla Wikipedia'da ara
+        wiki_bilgi = wiki_ara(isim)
         if wiki_bilgi:
             return wiki_bilgi
         
-        # Sonra web'de ara
-        web_bilgi = web_ara(f"{isim} kimdir")
-        if web_bilgi:
-            return web_bilgi
+        # Sonra "kimdir" ekleyerek ara
+        wiki_bilgi_kimdir = wiki_ara(f"{isim} kimdir")
+        if wiki_bilgi_kimdir:
+            return wiki_bilgi_kimdir
             
     except Exception as e:
         pass
@@ -370,6 +370,25 @@ def get_quote():
         "En büyük savaş, cahilliğe karşı yapılan savaştır. - Mustafa Kemal Atatürk"
     ]
     return random.choice(quotes)
+
+# -----------------------------
+# Context Tabanlı Hava Durumu
+# -----------------------------
+def is_hava_durumu_context(user_id, mesaj):
+    """Context'e göre hava durumu sorgusu olup olmadığını kontrol et"""
+    if user_id not in user_context or not user_context[user_id]:
+        return False
+    
+    son_mesajlar = [ctx["mesaj"].lower() for ctx in list(user_context[user_id])[-2:]]
+    
+    # Son mesajlarda hava durumu ile ilgili kelimeler var mı?
+    hava_kelimeleri = ["hava durumu", "hava", "derece", "kaç derece", "havası", "nem", "rüzgar"]
+    
+    for mesaj in son_mesajlar + [mesaj.lower()]:
+        if any(kelime in mesaj for kelime in hava_kelimeleri):
+            return True
+    
+    return False
 
 # -----------------------------
 # Geliştirilmiş Cevap Motoru - TÜM HATALAR DÜZELTİLDİ
@@ -468,23 +487,28 @@ def cevap_ver(mesaj, user_id="default"):
         
         return "⏰ Hatırlatıcı formatı: '30 dakika sonra egzersiz yap' şeklinde olmalı."
 
-    # Hava durumu sorguları - ÖNCELİKLİ
-    if any(x in mesaj_lc for x in ["hava durumu", "hava", "derece", "kaç derece", "havası"]):
+    # Hava durumu sorguları - CONTEXT DÜZELTMESİ
+    if any(x in mesaj_lc for x in ["hava durumu", "hava", "derece", "kaç derece", "havası"]) or is_hava_durumu_context(user_id, mesaj_lc):
         # Önce genel "hava durumu" sorusu
         if mesaj_lc in ["hava durumu", "hava durumu nedir"]:
             cevap = "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Örneğin: 'İstanbul'da hava durumu' veya 'Ankara kaç derece?'"
             kaydet_context(user_id, mesaj_raw, cevap)
             return cevap
         
+        # Context'te hava durumu varsa ve mesaj bir şehir ise
         city = mesajdaki_sehir(mesaj_raw)
         if city:
             cevap = hava_durumu(city)
             kaydet_context(user_id, mesaj_raw, cevap)
             return cevap
-        else:
-            cevap = "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Örneğin: 'İstanbul'da hava durumu'"
+        elif is_hava_durumu_context(user_id, mesaj_lc):
+            # Context hava durumu ama şehir yok
+            cevap = "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz?"
             kaydet_context(user_id, mesaj_raw, cevap)
             return cevap
+        else:
+            # Şehir yoksa normal işleme devam et
+            pass
 
     # Yemek tarifi - ÖNCELİKLİ
     if tarif_var_mi(mesaj_raw):
@@ -512,13 +536,20 @@ def cevap_ver(mesaj, user_id="default"):
 
     # Kişi sorguları - ÖNCELİKLİ
     if any(x in mesaj_lc for x in ["kimdir", "kim", "hakkında", "biyografi"]):
-        # İsimleri ayıkla
-        kisi_isimleri = ["recep tayyip erdoğan", "mustafa kemal atatürk", "acun ılıcalı", 
-                         "canan karatay", "kenan sofuoğlu", "aziz sancar", "naime erdem"]
+        # Önemli kişileri kontrol et
+        kisi_esleme = {
+            "recep tayyip erdoğan": "Recep Tayyip Erdoğan",
+            "mustafa kemal atatürk": "Mustafa Kemal Atatürk", 
+            "acun ılıcalı": "Acun Ilıcalı",
+            "canan karatay": "Canan Karatay",
+            "kenan sofuoğlu": "Kenan Sofuoğlu",
+            "aziz sancar": "Aziz Sancar",
+            "naime erdem": "Naime Erdem"
+        }
         
-        for isim in kisi_isimleri:
-            if isim in mesaj_lc:
-                kisi_bilgi = kisi_sorgula(isim.title())
+        for anahtar, isim in kisi_esleme.items():
+            if anahtar in mesaj_lc:
+                kisi_bilgi = kisi_sorgula(isim)
                 if kisi_bilgi:
                     kaydet_context(user_id, mesaj_raw, kisi_bilgi)
                     return kisi_bilgi
@@ -532,13 +563,21 @@ def cevap_ver(mesaj, user_id="default"):
         kaydet_context(user_id, mesaj_raw, cevap)
         return cevap
 
+    # Şehir bilgisi (yalnızca şehir ismi varsa ve hava durumu context'i yoksa)
+    city = mesajdaki_sehir(mesaj_raw)
+    if city and not is_hava_durumu_context(user_id, mesaj_lc):
+        wiki_sehir = wiki_ara(city)
+        if wiki_sehir:
+            kaydet_context(user_id, mesaj_raw, wiki_sehir)
+            return wiki_sehir
+
     # NLP
     nlp_resp = nlp_cevap(mesaj_raw)
     if nlp_resp:
         kaydet_context(user_id, mesaj_raw, nlp_resp)
         return nlp_resp
 
-    # Wikipedia
+    # Wikipedia (genel konular)
     wiki_sonuc = wiki_ara(mesaj_raw)
     if wiki_sonuc:
         kaydet_context(user_id, mesaj_raw, wiki_sonuc)
