@@ -3,10 +3,6 @@ import os, json, re, random, requests
 from difflib import SequenceMatcher
 from collections import deque
 from urllib.parse import quote
-import speech_recognition as sr
-from gtts import gTTS
-import pygame
-import io
 import base64
 from datetime import datetime
 import threading
@@ -28,9 +24,8 @@ password_pending = set()
 
 WEATHER_API_KEY = "6a7a443921825622e552d0cde2d2b688"
 
-# Ses tanıma için
-recognizer = sr.Recognizer()
-microphone = sr.Microphone()
+# Ses özellikleri devre dışı - Render uyumluluğu için
+SPEECH_ENABLED = False
 
 # Ses önbelleği dizini oluştur
 if not os.path.exists(AUDIO_DIR):
@@ -148,45 +143,15 @@ def kaydet_context(user_id, mesaj, cevap):
     user_context[user_id].append({"mesaj": mesaj, "cevap": cevap})
 
 # -----------------------------
-# Ses İşlemleri
+# Ses İşlemleri (Render için devre dışı)
 # -----------------------------
 def text_to_speech(text, lang='tr'):
-    """Metni sese dönüştür ve base64 olarak döndür"""
-    try:
-        # Önbellek dosyası oluştur
-        filename = f"tts_{hash(text)}_{lang}.mp3"
-        filepath = os.path.join(AUDIO_DIR, filename)
-        
-        # Önbellekte yoksa oluştur
-        if not os.path.exists(filepath):
-            tts = gTTS(text=text, lang=lang, slow=False)
-            tts.save(filepath)
-        
-        # Base64'e çevir
-        with open(filepath, 'rb') as f:
-            audio_data = f.read()
-        
-        return base64.b64encode(audio_data).decode('utf-8')
-    except Exception as e:
-        print(f"TTS hatası: {e}")
-        return None
+    """Metni sese dönüştür - Render için devre dışı"""
+    return None
 
 def speech_to_text(audio_data):
-    """Sesi metne dönüştür"""
-    try:
-        # Geçici dosya oluştur
-        temp_file = os.path.join(AUDIO_DIR, "temp_audio.wav")
-        with open(temp_file, 'wb') as f:
-            f.write(audio_data)
-        
-        # Ses tanıma
-        with sr.AudioFile(temp_file) as source:
-            audio = recognizer.record(source)
-            text = recognizer.recognize_google(audio, language="tr-TR")
-            return text
-    except Exception as e:
-        print(f"STT hatası: {e}")
-        return None
+    """Sesi metne dönüştür - Render için devre dışı"""
+    return None
 
 # -----------------------------
 # Hava durumu
@@ -471,12 +436,8 @@ def index():
                 <code>POST /chat</code>
             </div>
             <div class="feature">
-                <h3>🎤 Ses Sohbeti:</h3>
-                <code>POST /speech_chat</code>
-            </div>
-            <div class="feature">
-                <h3>🔊 Metin-Ses Dönüşümü:</h3>
-                <code>POST /tts</code>
+                <h3>🎤 Ses Sohbeti (Devre Dışı):</h3>
+                <code>POST /speech_chat</code> <em>Render için devre dışı</em>
             </div>
         </div>
     </body>
@@ -493,49 +454,17 @@ def chat():
 
 @app.route("/speech_chat", methods=["POST"])
 def speech_chat():
-    """Sesli sohbet endpoint'i"""
-    try:
-        if 'audio' not in request.files:
-            return jsonify({"error": "Ses dosyası bulunamadı"}), 400
-        
-        audio_file = request.files['audio']
-        user_id = request.form.get("user_id", "default")
-        
-        # Ses dosyasını oku
-        audio_data = audio_file.read()
-        
-        # Sesi metne çevir
-        text = speech_to_text(audio_data)
-        if not text:
-            return jsonify({"error": "Ses anlaşılamadı"}), 400
-        
-        # Metni işle
-        cevap = cevap_ver(text, user_id)
-        
-        # Cevabı sese çevir
-        audio_base64 = text_to_speech(cevap)
-        
-        return jsonify({
-            "orjinal_metin": text,
-            "cevap": cevap,
-            "ses_cevap": audio_base64
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    """Sesli sohbet endpoint'i - Render için devre dışı"""
+    return jsonify({
+        "error": "Ses özellikleri Render'da devre dışı bırakıldı",
+        "orjinal_metin": "",
+        "cevap": "Ses özellikleri şu anda kullanılamıyor. Lütfen metin sohbetini kullanın."
+    })
 
 @app.route("/tts", methods=["POST"])
 def text_to_speech_api():
-    """Metni sese dönüştürme endpoint'i"""
-    data = request.get_json(force=True)
-    text = data.get("text", "")
-    lang = data.get("lang", "tr")
-    
-    audio_base64 = text_to_speech(text, lang)
-    if audio_base64:
-        return jsonify({"audio": audio_base64})
-    else:
-        return jsonify({"error": "Ses oluşturulamadı"}), 500
+    """Metni sese dönüştürme endpoint'i - Render için devre dışı"""
+    return jsonify({"error": "Ses özellikleri Render'da devre dışı bırakıldı"}), 503
 
 @app.route("/_nlp_dump", methods=["GET"])
 def nlp_dump():
@@ -546,13 +475,11 @@ def features():
     """Mevcut özellikleri listele"""
     features_list = [
         "🤖 Akıllı sohbet",
-        "🔢 Matematik hesaplamaları",
+        "🔢 Matematik hesaplamaları", 
         "🌤️ Hava durumu sorgulama",
-        "🍳 Yemek tarifleri", 
+        "🍳 Yemek tarifleri",
         "📚 Wikipedia araştırma",
         "🔍 Web araması",
-        "🎤 Sesli sohbet",
-        "🔊 Metin-okuma",
         "⏰ Hatırlatıcılar",
         "😊 Şakalar ve alıntılar",
         "🕒 Zaman ve tarih",
@@ -562,9 +489,6 @@ def features():
 
 if __name__=="__main__":
     port = int(os.environ.get("PORT", 5000))
-    # Mikrofonu hazırla
-    print("Mikrofon hazırlanıyor...")
-    with microphone as source:
-        recognizer.adjust_for_ambient_noise(source)
     print(f"MELDRA AI {port} portunda başlatılıyor...")
+    print("Ses özellikleri: DEVRE DIŞI (Render uyumluluğu)")
     app.run(host="0.0.0.0", port=port, debug=False)
