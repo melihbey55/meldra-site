@@ -4,3 +4,4 @@ beautifulsoup4==4.12.3
 gTTS==2.5.3
 SpeechRecognition==3.10.4
 pygame==2.6.1
+gunicorn==23.0.0
