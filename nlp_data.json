@@ -646,6 +646,14 @@
   },
   {
     "triggers": [
+      "gzyfl"
+    ],
+    "responses": [
+      "sfl kardeşim onun adı."
+    ]
+  },
+  {
+    "triggers": [
       "dorukhan"
     ],
     "responses": [
@@ -660,4 +668,5 @@
       "yakışıklı 1.90 basketçi."
     ]
   }
+
 ]
