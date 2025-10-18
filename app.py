@@ -38,15 +38,17 @@ INDEX_FILE = os.path.join(BASE_DIR, "index.html")
 # GLOBAL DEĞİŞKENLER VE VERİ YAPILARI
 # =============================
 
-# Kullanıcı durum yönetimi - FIXED: Daha iyi state management
+# Kullanıcı durum yönetimi - TAMAMEN YENİ STATE SİSTEMİ
 user_context = defaultdict(lambda: deque(maxlen=10))
 conversation_history = defaultdict(lambda: deque(maxlen=20))
+
+# Basit ve etkili state management
 user_states = defaultdict(lambda: {
     'waiting_for_city': False,
     'last_intent': None,
-    'last_entities': {},
-    'conversation_topic': None
+    'conversation_context': []
 })
+
 king_mode = set()
 password_pending = set()
 
@@ -109,7 +111,7 @@ INTELLIGENT_RECIPES = {
 }
 
 # =============================
-# İLERİ SEVİYE NLP MOTORU - FIXED
+# İLERİ SEVİYE NLP MOTORU - TAMAMEN YENİLENDİ
 # =============================
 
 class AdvancedNLU:
@@ -121,70 +123,80 @@ class AdvancedNLU:
                     r'sıcaklık', r'hava.*nasıl', r'yağmur', r'kar', r'güneş',
                     r'havasi', r'kaç.*derece'
                 ],
-                'priority': 10
+                'priority': 10,
+                'requires_city': True
             },
             'cooking': {
                 'patterns': [
                     r'tarif', r'nasıl.*yapılır', r'yapımı', r'malzeme', r'pişirme',
                     r'yemek', r'yemeği', r'recipe', r'ingredient', r'tarifi'
                 ],
-                'priority': 9
+                'priority': 9,
+                'requires_city': False
             },
             'math': {
                 'patterns': [
                     r'hesapla', r'kaç.*eder', r'topla', r'çıkar', r'çarp', r'böl',
                     r'artı', r'eksi', r'çarpi', r'bölü', r'matematik', r'\+', r'-', r'\*', r'/'
                 ],
-                'priority': 8
+                'priority': 8,
+                'requires_city': False
             },
             'time': {
                 'patterns': [
                     r'saat', r'zaman', r'tarih', r'gün', r'kaç.*old', r'ne.*zaman',
                     r'saattir', r'tarihi'
                 ],
-                'priority': 7
+                'priority': 7,
+                'requires_city': False
             },
             'news': {
                 'patterns': [
                     r'haber', r'gündem', r'son.*dakika', r'gazete', r'manşet',
                     r'dünya', r'ekonomi', r'spor', r'magazin'
                 ],
-                'priority': 6
+                'priority': 6,
+                'requires_city': False
             },
             'person_query': {
                 'patterns': [
                     r'kimdir', r'kim.*dir', r'hakkında', r'biyografi', r'kisilik',
                     r'kac.*yasinda', r'nereli', r'ne.*is.*yapar'
                 ],
-                'priority': 9
+                'priority': 9,
+                'requires_city': False
             },
             'knowledge': {
                 'patterns': [
                     r'nedir', r'nasıl', r'niçin', r'ne.*zaman', r'nerede',
                     r'hangi', r'açıkla', r'bilgi', r'anlamı'
                 ],
-                'priority': 5
+                'priority': 5,
+                'requires_city': False
             },
             'greeting': {
                 'patterns': [
                     r'merhaba', r'selam', r'hey', r'hi', r'hello', r'günaydın',
                     r'iyi.*günler', r'naber', r'ne.*haber'
                 ],
-                'priority': 10
+                'priority': 10,
+                'requires_city': False
             },
             'thanks': {
                 'patterns': [
                     r'teşekkür', r'sağ ol', r'thanks', r'thank you', r'eyvallah',
                     r'mersi'
                 ],
-                'priority': 10
+                'priority': 10,
+                'requires_city': False
             },
             'entertainment': {
                 'patterns': [
                     r'şaka', r'fıkra', r'eğlence', r'komik', r'eğlen',
                     r'oyun', r'eğlenceli', r'güldür'
                 ],
-                'priority': 4
+                'priority': 4,
+                'requires_city': False
             }
         }
         
@@ -214,33 +226,43 @@ class AdvancedNLU:
             text = text.replace(old, new)
         return text
 
-    def extract_intent(self, text: str) -> Tuple[str, float]:
-        """Metinden intent çıkarır ve güven skoru döndürür"""
+    def extract_intent(self, text: str) -> Tuple[str, float, Dict]:
+        """Metinden intent çıkarır ve güven skoru döndürür - GELİŞMİŞ VERSİYON"""
         normalized = self.normalize_text(text)
         scores = {}
+        intent_details = {}
         
         for intent, data in self.intent_patterns.items():
             score = 0
+            pattern_matches = []
+            
             for pattern in data['patterns']:
                 matches = re.findall(pattern, normalized)
-                score += len(matches) * 2  # Her eşleşme için bonus
-                
-                # Tam cümle eşleşmesi için ekstra puan
-                if re.search(r'\b' + pattern + r'\b', normalized):
-                    score += 3
+                if matches:
+                    score += len(matches) * 2
+                    pattern_matches.extend(matches)
+                    
+                    # Tam cümle eşleşmesi için ekstra puan
+                    if re.search(r'\b' + pattern + r'\b', normalized):
+                        score += 3
             
             # Priority bonus
             score += data['priority']
             scores[intent] = score
+            intent_details[intent] = {
+                'score': score,
+                'matches': pattern_matches,
+                'requires_city': data['requires_city']
+            }
         
         if not scores:
-            return 'unknown', 0.0
+            return 'unknown', 0.0, {}
         
         best_intent = max(scores.items(), key=lambda x: x[1])
         max_score = max(scores.values())
         confidence = min(best_intent[1] / (max_score + 0.1), 1.0)
         
-        return best_intent[0], confidence
+        return best_intent[0], confidence, intent_details.get(best_intent[0], {})
 
     def extract_entities(self, text: str) -> Dict[str, Any]:
         """Metinden entity çıkarır"""
@@ -292,22 +314,20 @@ class AdvancedNLU:
         
         return entities
 
-    def is_weather_follow_up(self, user_id: str, current_message: str) -> bool:
-        """Hava durumu takip sorusu mu kontrol eder - FIXED"""
-        if user_id not in user_states:
-            return False
-        
+    def should_ask_for_city(self, user_id: str, current_intent: str, entities: Dict, intent_details: Dict) -> bool:
+        """Şehir sormalı mı kontrol eder - BASİT VE ETKİLİ"""
         state = user_states[user_id]
         
-        # Sadece waiting_for_city state'i True ise follow-up kabul et
+        # Eğer zaten şehir bekliyorsak ve bu bir teşekkür/selam değilse True
         if state.get('waiting_for_city'):
+            if current_intent in ['thanks', 'greeting']:
+                return False
             return True
         
-        # Teşekkür, selam gibi mesajları follow-up olarak kabul etme
-        current_intent, _ = self.extract_intent(current_message)
-        if current_intent in ['thanks', 'greeting']:
-            return False
-        
+        # Hava durumu intent'i ve şehir yoksa
+        if current_intent == 'weather' and not entities.get('city') and intent_details.get('requires_city', False):
+            return True
+            
         return False
 
 nlu_engine = AdvancedNLU()
@@ -455,7 +475,7 @@ class IntelligentAPI:
 api_client = IntelligentAPI()
 
 # =============================
-# AKILLI KONUŞMA YÖNETİCİSİ - FIXED
+# AKILLI KONUŞMA YÖNETİCİSİ - BASİTLEŞTİRİLMİŞ
 # =============================
 
 class ConversationManager:
@@ -548,7 +568,7 @@ class MathEngine:
 math_engine = MathEngine()
 
 # =============================
-# ANA CEVAP ÜRETME MOTORU - FIXED
+# ANA CEVAP ÜRETME MOTORU - TAMAMEN YENİ
 # =============================
 
 class ResponseEngine:
@@ -572,103 +592,104 @@ class ResponseEngine:
         ]
 
     def generate_response(self, message: str, user_id: str = "default") -> str:
-        """Ana cevap üretme fonksiyonu - FIXED"""
+        """Ana cevap üretme fonksiyonu - YENİ MANTIK"""
         start_time = time.time()
         
         # Konuşma geçmişine kullanıcı mesajını ekle
         conv_manager.add_message(user_id, 'user', message)
         
-        # NLU analizi
-        intent, confidence = nlu_engine.extract_intent(message)
+        # NLU analizi - YENİ FORMAT
+        intent, confidence, intent_details = nlu_engine.extract_intent(message)
         entities = nlu_engine.extract_entities(message)
         
         logger.info(f"NLU Analysis - Intent: {intent}, Confidence: {confidence:.2f}, Entities: {entities}")
         
-        # State güncelleme - FIXED: Daha iyi state management
-        current_state = user_states[user_id]
+        # State management - BASİT VE ETKİLİ
+        state = user_states[user_id]
         
-        # Teşekkür veya selam gibi mesajlarda waiting_for_city state'ini temizle
-        if intent in ['thanks', 'greeting']:
-            current_state['waiting_for_city'] = False
+        # ÖNCE: waiting_for_city state'ini kontrol et
+        if state.get('waiting_for_city'):
+            # Şehir beklerken gelen mesajı işle
+            return self.handle_city_response(message, user_id, intent, entities)
         
-        # Yüksek güvenilirlikli intent'ler için özel işlemler
-        if confidence > 0.7:  # Threshold'u düşürdük
-            response = self.handle_high_confidence_intent(intent, entities, message, user_id)
-            if response:
-                self.finalize_response(user_id, response, start_time)
-                return response
+        # SONRA: Normal intent işleme
+        response = self.handle_intent(intent, confidence, entities, message, user_id, intent_details)
         
-        # Düşük güvenilirlik veya karmaşık sorular için OpenAI
-        if confidence < 0.6 or intent == 'unknown':
-            ai_response = self.try_ai_generation(message, user_id, intent, entities)
-            if ai_response:
-                self.finalize_response(user_id, ai_response, start_time)
-                return ai_response
+        if response:
+            self.finalize_response(user_id, response, start_time)
+            return response
         
         # Fallback
         response = random.choice(self.fallback_responses)
         self.finalize_response(user_id, response, start_time)
         return response
 
-    def handle_high_confidence_intent(self, intent: str, entities: Dict, message: str, user_id: str) -> Optional[str]:
-        """Yüksek güvenilirlikli intent'leri işler - FIXED"""
+    def handle_city_response(self, message: str, user_id: str, intent: str, entities: Dict) -> str:
+        """Şehir beklerken gelen mesajı işler"""
+        state = user_states[user_id]
         
-        current_state = user_states[user_id]
+        # Şehir bulmaya çalış
+        for city in TURKISH_CITIES:
+            if city in nlu_engine.normalize_text(message):
+                state['waiting_for_city'] = False
+                weather = api_client.get_weather(city)
+                return weather
+        
+        # Eğer teşekkür veya selam ise state'i temizle ve normal cevap ver
+        if intent in ['thanks', 'greeting']:
+            state['waiting_for_city'] = False
+            if intent == 'thanks':
+                return random.choice(self.thanks_responses)
+            else:
+                return random.choice(self.greeting_responses)
+        
+        # Hala şehir bulunamadıysa tekrar sor
+        return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Lütfen bir şehir ismi yazın (örneğin: İstanbul, Ankara)."
+
+    def handle_intent(self, intent: str, confidence: float, entities: Dict, message: str, user_id: str, intent_details: Dict) -> Optional[str]:
+        """Intent'i işler"""
+        state = user_states[user_id]
+        
+        if confidence < 0.6:
+            return None
         
         if intent == 'greeting':
-            current_state['waiting_for_city'] = False
             return random.choice(self.greeting_responses)
         
         elif intent == 'thanks':
-            current_state['waiting_for_city'] = False
             return random.choice(self.thanks_responses)
         
         elif intent == 'weather':
-            return self.handle_weather_intent(entities, user_id, message)
+            return self.handle_weather_intent(entities, user_id, intent_details)
         
         elif intent == 'cooking':
-            current_state['waiting_for_city'] = False
             return self.handle_cooking_intent(entities, message)
         
         elif intent == 'math':
-            current_state['waiting_for_city'] = False
             return self.handle_math_intent(message)
         
         elif intent == 'person_query':
-            current_state['waiting_for_city'] = False
             return self.handle_person_query(entities, message)
         
         elif intent == 'time':
-            current_state['waiting_for_city'] = False
             return self.handle_time_query()
         
         elif intent == 'news':
-            current_state['waiting_for_city'] = False
             return self.handle_news_query(entities)
         
         return None
 
-    def handle_weather_intent(self, entities: Dict, user_id: str, message: str) -> Optional[str]:
-        """Hava durumu sorgularını işler - FIXED"""
-        current_state = user_states[user_id]
+    def handle_weather_intent(self, entities: Dict, user_id: str, intent_details: Dict) -> Optional[str]:
+        """Hava durumu sorgularını işler - YENİ MANTIK"""
+        state = user_states[user_id]
         city = entities.get('city')
         
-        # Eğer şehir varsa veya waiting state'inde değilsek normal işlem
         if city:
-            current_state['waiting_for_city'] = False
+            # Şehir varsa direkt hava durumu getir
             return api_client.get_weather(city)
-        elif current_state.get('waiting_for_city'):
-            # Waiting state'inde isek ve mesajda şehir ara
-            for possible_city in TURKISH_CITIES:
-                if possible_city in nlu_engine.normalize_text(message):
-                    current_state['waiting_for_city'] = False
-                    return api_client.get_weather(possible_city)
-            
-            # Şehir bulunamazsa tekrar sor
-            return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Lütfen bir şehir ismi yazın."
         else:
-            # Şehir belirtilmemişse state'i set et ve sor
-            current_state['waiting_for_city'] = True
+            # Şehir yoksa state'i set et ve sor
+            state['waiting_for_city'] = True
             return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Örneğin: 'İstanbul hava durumu' veya 'Ankara kaç derece?'"
 
     def handle_cooking_intent(self, entities: Dict, message: str) -> Optional[str]:
@@ -743,37 +764,11 @@ class ResponseEngine:
 
     def extract_person_name(self, message: str) -> Optional[str]:
         """Mesajdan kişi ismini çıkarır"""
-        # Basit isim çıkarma (gerçek uygulamada daha gelişmiş NLP kullanılır)
         words = message.lower().split()
         for i, word in enumerate(words):
             if word in ['kimdir', 'kim', 'hakkında'] and i > 0:
                 return ' '.join(words[max(0, i-2):i]).title()
         return None
-
-    def try_ai_generation(self, message: str, user_id: str, intent: str, entities: Dict) -> Optional[str]:
-        """OpenAI ile akıllı cevap üretmeyi dener"""
-        # Waiting_for_city state'inde ise OpenAI'ı kullanma
-        if user_states[user_id].get('waiting_for_city'):
-            return None
-            
-        context = conv_manager.get_recent_context(user_id, 3)
-        conversation_summary = conv_manager.get_conversation_summary(user_id)
-        
-        prompt = f"""
-        Kullanıcı: {message}
-        Konuşma Özeti: {conversation_summary}
-        Intent: {intent}
-        Entities: {entities}
-        Son Mesajlar: {[msg['content'] for msg in context]}
-        
-        Sen Meldra adında çok gelişmiş bir Türkçe yapay zeka asistanısın. 
-        Kullanıcının sorusuna en doğru, detaylı ve yararlı şekilde cevap ver.
-        Cevabın kısa, net ve bilgilendirici olsun.
-        Eğer kullanıcının ne istediğinden emin değilsen, açıklayıcı şekilde sor.
-        """
-        
-        response = api_client.openai_completion(prompt, max_tokens=350)
-        return response if response and len(response) > 10 else None
 
     def finalize_response(self, user_id: str, response: str, start_time: float):
         """Cevabı sonlandırır ve loglar"""
@@ -875,25 +870,21 @@ def index():
     <body>
         <div class="container">
             <div class="header">
-                <h1>🚀 MELDRA AI</h1>
-                <p>ChatGPT'den Daha Akıllı, Her Soruya Doğru Cevap!</p>
+                <h1>🚀 MELDRA AI v4.1</h1>
+                <p>Akıllı Konuşma - Sorunsuz Diyalog!</p>
                 
                 <div style="margin-top: 30px;">
                     <div class="api-status">
                         <span class="status-dot"></span>
-                        OpenAI GPT-3.5: Aktif
+                        Akıllı State Management: Aktif
                     </div>
                     <div class="api-status">
                         <span class="status-dot"></span>
-                        Google Search: Aktif
+                        Gelişmiş NLP: Aktif
                     </div>
                     <div class="api-status">
                         <span class="status-dot"></span>
-                        Weather API: Aktif
-                    </div>
-                    <div class="api-status">
-                        <span class="status-dot"></span>
-                        News API: Aktif
+                        Çoklu API: Aktif
                     </div>
                 </div>
             </div>
@@ -901,33 +892,23 @@ def index():
             <div class="features-grid">
                 <div class="feature-card">
                     <h3>🤖 Akıllı Sohbet</h3>
-                    <p>Gelişmiş AI ile doğal konuşma, context anlama ve akıllı cevaplar</p>
+                    <p>Gelişmiş state management ile sorunsuz konuşma deneyimi</p>
                     <code>POST /chat</code>
                 </div>
                 
                 <div class="feature-card">
                     <h3>🌤️ Gelişmiş Hava Durumu</h3>
-                    <p>Gerçek zamanlı hava durumu bilgileri ve akıllı şehir tanıma</p>
+                    <p>State takılmadan akıllı şehir tanıma</p>
                 </div>
                 
                 <div class="feature-card">
                     <h3>🔍 Gerçek Zamanlı Arama</h3>
-                    <p>Google Search API ile güncel ve doğru bilgiler</p>
+                    <p>Google Search API ile güncel bilgiler</p>
                 </div>
                 
                 <div class="feature-card">
                     <h3>👤 Kişi Sorgulama</h3>
-                    <p>Ünlü kişiler hakkında detaylı ve doğru bilgiler</p>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>🍳 Akıllı Tarifers</h3>
-                    <p>Detaylı yemek tarifleri ve malzeme listeleri</p>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>📰 Canlı Haberler</h3>
-                    <p>Kategori bazlı son dakika haberleri</p>
+                    <p>Ünlü kişiler hakkında detaylı bilgiler</p>
                 </div>
             </div>
         </div>
@@ -967,16 +948,15 @@ def chat():
 @app.route("/status", methods=["GET"])
 def status():
     return jsonify({
-        "status": "active",
-        "version": "4.0.1",
+        "status": "active", 
+        "version": "4.1.0",
         "timestamp": datetime.now().isoformat(),
         "features": [
-            "Advanced NLU Engine",
+            "Advanced State Management",
+            "Smart Intent Recognition", 
             "Multi-API Integration",
-            "Conversation Memory",
-            "Smart Context Understanding",
-            "Real-time Information",
-            "Intelligent Response Generation"
+            "Conversation Context",
+            "Real-time Information"
         ],
         "statistics": {
             "active_users": len(conversation_history),
@@ -988,7 +968,24 @@ def status():
 @app.route("/clear_cache", methods=["POST"])
 def clear_cache():
     api_client.cache.clear()
-    return jsonify({"status": "Cache cleared"})
+    # State'leri de temizle
+    user_states.clear()
+    return jsonify({"status": "Cache and states cleared"})
+
+@app.route("/reset_state", methods=["POST"])
+def reset_state():
+    """Kullanıcı state'ini sıfırla"""
+    data = request.get_json(force=True)
+    user_id = data.get("user_id", "default")
+    
+    if user_id in user_states:
+        user_states[user_id] = {
+            'waiting_for_city': False,
+            'last_intent': None,
+            'conversation_context': []
+        }
+    
+    return jsonify({"status": f"State reset for user {user_id}"})
 
 # =============================
 # UYGULAMA BAŞLATMA
@@ -998,14 +995,13 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     
     print("🚀" * 60)
-    print("🚀 MELDRA AI ULTRA v4.0.1 - Tüm Sistemler Aktif!")
+    print("🚀 MELDRA AI v4.1 - AKILLI STATE MANAGEMENT AKTİF!")
     print("🚀 Port:", port)
     print("🚀 Özellikler:")
-    print("🚀   • Gelişmiş NLU Motoru")
-    print("🚀   • Çoklu API Entegrasyonu")
-    print("🚀   • Akıllı Konuşma Yönetimi")
-    print("🚀   • Gerçek Zamanlı Bilgi")
-    print("🚀   • Context Anlama")
+    print("🚀   • Yeni State Management Sistemi")
+    print("🚀   • Takılmayan Konuşma Akışı") 
+    print("🚀   • Gelişmiş Intent Tanıma")
+    print("🚀   • Sorunsuz Hava Durumu Sorgulama")
     print("🚀" * 60)
     
     app.run(host="0.0.0.0", port=port, debug=False)
