@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import os, re, random, requests
 from collections import deque, defaultdict
 from urllib.parse import quote
@@ -19,11 +19,11 @@ app = Flask(__name__)
 # =============================
 
 # Environment variables'dan API key'leri al
-WEATHER_API_KEY = os.environ.get('6a7a443921825622e552d0cde2d2b688')
-NEWS_API_KEY = os.environ.get('94ac5f3a6ea34ed0918d28958c7e7aa6')
-GOOGLE_SEARCH_KEY = os.environ.get('AIzaSyCphCUBFyb0bBVMVG5JupVOjKzoQq33G-c')
-GOOGLE_CX = os.environ.get('d15c352df36b9419f')
-OPENAI_API_KEY = os.environ.get('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')
+WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', '6a7a443921825622e552d0cde2d2b688')
+NEWS_API_KEY = os.environ.get('NEWS_API_KEY', '94ac5f3a6ea34ed0918d28958c7e7aa6')
+GOOGLE_SEARCH_KEY = os.environ.get('GOOGLE_SEARCH_KEY', 'AIzaSyCphCUBFyb0bBVMVG5JupVOjKzoQq33G-c')
+GOOGLE_CX = os.environ.get('GOOGLE_CX', 'd15c352df36b9419f')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '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')
 
 # =============================
 # GLOBAL DEĞİŞKENLER
@@ -612,83 +612,186 @@ response_engine = ResponseEngine()
 
 @app.route("/")
 def index():
+    """Ana sayfa - Gelişmiş sohbet arayüzü"""
     return """
     <!DOCTYPE html>
-    <html>
+    <html lang="tr">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>MELDRA AI - Ultra Gelişmiş Yapay Zeka</title>
         <style>
-            body { 
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                margin: 0; 
+            * {
+                margin: 0;
                 padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: #333;
+                min-height: 100vh;
+                padding: 20px;
+            }
+            
+            .container {
+                max-width: 1000px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+            
+            .header {
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
-                min-height: 100vh;
-            }
-            .container { 
-                max-width: 1200px; 
-                margin: 0 auto; 
-                padding: 40px 20px;
-            }
-            .header {
-                text-align: center;
-                margin-bottom: 50px;
-            }
-            .header h1 {
-                font-size: 3.5em;
-                margin-bottom: 10px;
-                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            }
-            .header p {
-                font-size: 1.3em;
-                opacity: 0.9;
-            }
-            .features-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                gap: 25px;
-                margin-top: 40px;
-            }
-            .feature-card {
-                background: rgba(255,255,255,0.1);
                 padding: 30px;
-                border-radius: 20px;
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255,255,255,0.2);
-                transition: transform 0.3s ease;
+                text-align: center;
             }
-            .feature-card:hover {
-                transform: translateY(-5px);
+            
+            .header h1 {
+                font-size: 2.5em;
+                margin-bottom: 10px;
             }
-            .feature-card h3 {
-                font-size: 1.5em;
-                margin-bottom: 15px;
+            
+            .header p {
+                opacity: 0.9;
+                font-size: 1.1em;
+            }
+            
+            .chat-container {
+                display: flex;
+                height: 600px;
+            }
+            
+            .sidebar {
+                width: 300px;
+                background: #f8f9fa;
+                padding: 20px;
+                border-right: 1px solid #e9ecef;
+                overflow-y: auto;
+            }
+            
+            .features-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .feature-card {
+                background: white;
+                padding: 15px;
+                border-radius: 10px;
+                border-left: 4px solid #667eea;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            }
+            
+            .feature-card h4 {
+                color: #667eea;
+                margin-bottom: 5px;
                 display: flex;
                 align-items: center;
+                gap: 8px;
+            }
+            
+            .chat-area {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .messages {
+                flex: 1;
+                padding: 20px;
+                overflow-y: auto;
+                background: #fafafa;
+            }
+            
+            .message {
+                margin-bottom: 15px;
+                padding: 12px 16px;
+                border-radius: 15px;
+                max-width: 80%;
+                word-wrap: break-word;
+            }
+            
+            .user-message {
+                background: #667eea;
+                color: white;
+                margin-left: auto;
+                border-bottom-right-radius: 5px;
+            }
+            
+            .bot-message {
+                background: white;
+                border: 1px solid #e9ecef;
+                margin-right: auto;
+                border-bottom-left-radius: 5px;
+            }
+            
+            .input-area {
+                padding: 20px;
+                border-top: 1px solid #e9ecef;
+                background: white;
+            }
+            
+            .input-group {
+                display: flex;
                 gap: 10px;
             }
-            .api-status {
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                padding: 8px 16px;
-                background: rgba(76, 175, 80, 0.2);
-                border-radius: 20px;
-                margin: 5px;
-                border: 1px solid rgba(76, 175, 80, 0.5);
+            
+            #messageInput {
+                flex: 1;
+                padding: 12px 16px;
+                border: 1px solid #ddd;
+                border-radius: 25px;
+                outline: none;
+                font-size: 16px;
             }
+            
+            #messageInput:focus {
+                border-color: #667eea;
+            }
+            
+            #sendButton {
+                padding: 12px 24px;
+                background: #667eea;
+                color: white;
+                border: none;
+                border-radius: 25px;
+                cursor: pointer;
+                font-size: 16px;
+                transition: background 0.3s;
+            }
+            
+            #sendButton:hover {
+                background: #5a6fd8;
+            }
+            
+            .typing-indicator {
+                display: none;
+                padding: 10px 16px;
+                color: #666;
+                font-style: italic;
+            }
+            
             .status-dot {
-                width: 10px;
-                height: 10px;
+                display: inline-block;
+                width: 8px;
+                height: 8px;
                 border-radius: 50%;
                 background: #4CAF50;
-                animation: pulse 2s infinite;
+                margin-right: 5px;
             }
-            @keyframes pulse {
-                0% { opacity: 1; }
-                50% { opacity: 0.5; }
-                100% { opacity: 1; }
+            
+            .api-status {
+                background: rgba(102, 126, 234, 0.1);
+                padding: 10px;
+                border-radius: 10px;
+                margin-top: 15px;
+                font-size: 0.9em;
             }
         </style>
     </head>
@@ -697,60 +800,137 @@ def index():
             <div class="header">
                 <h1>🚀 MELDRA AI v5.0</h1>
                 <p>Ultra Gelişmiş Yapay Zeka Asistanı</p>
-                
-                <div style="margin-top: 30px;">
-                    <div class="api-status">
-                        <span class="status-dot"></span>
-                        Akıllı NLP: Aktif
-                    </div>
-                    <div class="api-status">
-                        <span class="status-dot"></span>
-                        Çoklu API: Aktif
-                    </div>
-                    <div class="api-status">
-                        <span class="status-dot"></span>
-                        Hava Durumu: Aktif
-                    </div>
-                    <div class="api-status">
-                        <span class="status-dot"></span>
-                        Google Arama: Aktif
-                    </div>
-                </div>
             </div>
             
-            <div class="features-grid">
-                <div class="feature-card">
-                    <h3>🤖 Akıllı Sohbet</h3>
-                    <p>Gelişmiş NLP ile doğal konuşma, intent algılama ve akıllı cevaplar</p>
-                    <code>POST /chat</code>
+            <div class="chat-container">
+                <div class="sidebar">
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <h4>🤖 Akıllı Sohbet</h4>
+                            <p>Gelişmiş NLP ile doğal konuşma</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🌤️ Hava Durumu</h4>
+                            <p>Gerçek zamanlı hava bilgileri</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🔍 Google Arama</h4>
+                            <p>Güncel ve doğru bilgiler</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🧮 Matematik</h4>
+                            <p>Akıllı hesaplamalar</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>📰 Canlı Haberler</h4>
+                            <p>Son dakika haberleri</p>
+                        </div>
+                    </div>
+                    
+                    <div class="api-status">
+                        <p><span class="status-dot"></span> Sistem: Aktif</p>
+                        <p><span class="status-dot"></span> NLP Motoru: Çalışıyor</p>
+                        <p><span class="status-dot"></span> API'ler: Bağlı</p>
+                    </div>
                 </div>
                 
-                <div class="feature-card">
-                    <h3>🌤️ Hava Durumu</h3>
-                    <p>Gerçek zamanlı hava durumu bilgileri ve akıllı şehir tanıma</p>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>🔍 Gerçek Zamanlı Arama</h3>
-                    <p>Google Search API ile güncel ve doğru bilgiler</p>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>🧮 Matematik</h3>
-                    <p>Akıllı matematik motoru ile hesaplamalar</p>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>📰 Canlı Haberler</h3>
-                    <p>Kategori bazlı son dakika haberleri</p>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>⚡ Hızlı Yanıt</h3>
-                    <p>Optimize edilmiş sistem ile milisaniyeler içinde cevap</p>
+                <div class="chat-area">
+                    <div class="messages" id="messages">
+                        <div class="message bot-message">
+                            Merhaba! Ben Meldra, size nasıl yardımcı olabilirim? 🌟<br>
+                            Hava durumu, haberler, hesaplamalar ve daha fazlası için buradayım!
+                        </div>
+                    </div>
+                    
+                    <div class="typing-indicator" id="typingIndicator">
+                        Meldra yazıyor...
+                    </div>
+                    
+                    <div class="input-area">
+                        <div class="input-group">
+                            <input type="text" id="messageInput" placeholder="Meldra'ya bir şey sorun..." autocomplete="off">
+                            <button id="sendButton">Gönder</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <script>
+            const messagesContainer = document.getElementById('messages');
+            const messageInput = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendButton');
+            const typingIndicator = document.getElementById('typingIndicator');
+            
+            function addMessage(content, isUser = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+                messageDiv.innerHTML = content.replace(/\\n/g, '<br>');
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            function showTyping() {
+                typingIndicator.style.display = 'block';
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            function hideTyping() {
+                typingIndicator.style.display = 'none';
+            }
+            
+            async function sendMessage() {
+                const message = messageInput.value.trim();
+                if (!message) return;
+                
+                // Kullanıcı mesajını ekle
+                addMessage(message, true);
+                messageInput.value = '';
+                
+                // Typing göstergesini göster
+                showTyping();
+                
+                try {
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            mesaj: message,
+                            user_id: 'web_user'
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    // Typing göstergesini gizle
+                    hideTyping();
+                    
+                    if (data.status === 'success') {
+                        addMessage(data.cevap);
+                    } else {
+                        addMessage('❌ Bir hata oluştu. Lütfen tekrar deneyin.');
+                    }
+                } catch (error) {
+                    hideTyping();
+                    addMessage('❌ Bağlantı hatası. Lütfen tekrar deneyin.');
+                }
+            }
+            
+            // Enter tuşu ile gönder
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // Buton ile gönder
+            sendButton.addEventListener('click', sendMessage);
+            
+            // Input'a odaklan
+            messageInput.focus();
+        </script>
     </body>
     </html>
     """
@@ -833,7 +1013,7 @@ if __name__ == "__main__":
     print("🚀   • Çoklu API Entegrasyonu")
     print("🚀   • Akıllı State Management")
     print("🚀   • Gerçek Zamanlı Bilgi")
-    print("🚀   • Hata Korumalı Sistem")
+    print("🚀   • Güzel Sohbet Arayüzü")
     print("🚀" * 60)
     
     app.run(host="0.0.0.0", port=port, debug=False)
