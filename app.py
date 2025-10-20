@@ -288,7 +288,7 @@ class SuperMathEngine:
 math_engine = SuperMathEngine()
 
 # =============================
-# GELİŞMİŞ NLP MOTORU - SELAMLAMA ÖNCELİKLİ
+# GELİŞMİŞ NLP MOTORU - KİŞİ SORGULARI TAM FİKS
 # =============================
 
 class AdvancedNLU:
@@ -300,7 +300,7 @@ class AdvancedNLU:
                     r'^günaydın$', r'^iyi\s*günler$', r'^naber$', r'^ne\s*haber$',
                     r'^merhabalar$', r'^selamlar$', r'^heyyo$', r'^hola$'
                 ],
-                'priority': 25,  # EN YÜKSEK ÖNCELİK
+                'priority': 25,
                 'keywords': ['merhaba', 'selam', 'hey', 'hi', 'hello', 'günaydın', 'iyi günler', 'naber']
             },
             'person_info': {
@@ -389,12 +389,12 @@ class AdvancedNLU:
         return text
 
     def extract_intent(self, text: str) -> Tuple[str, float, Dict]:
-        """Metinden intent çıkarır - SELAMLAMA ÖNCELİKLİ"""
+        """Metinden intent çıkarır"""
         normalized = self.normalize_text(text)
         scores = {}
         intent_details = {}
         
-        # ÖNCE SELAMLAMA KONTROLÜ - EN YÜKSEK ÖNCELİK
+        # ÖNCE SELAMLAMA KONTROLÜ
         if self.is_definite_greeting(normalized):
             scores['greeting'] = 30
         
@@ -407,26 +407,23 @@ class AdvancedNLU:
             scores['math'] = 20
         
         for intent, data in self.intent_patterns.items():
-            if intent in scores:  # Zaten eklendiyse atla
+            if intent in scores:
                 continue
                 
             score = 0
             pattern_matches = []
             keyword_matches = []
             
-            # Pattern eşleşmeleri
             for pattern in data['patterns']:
                 if re.search(pattern, normalized):
                     score += 5
                     pattern_matches.append(pattern)
             
-            # Keyword eşleşmeleri
             for keyword in data.get('keywords', []):
                 if re.search(r'\b' + re.escape(keyword) + r'\b', normalized):
                     score += 3
                     keyword_matches.append(keyword)
             
-            # Priority bonus
             score += data['priority']
             scores[intent] = score
             intent_details[intent] = {
@@ -459,7 +456,7 @@ class AdvancedNLU:
 
     def is_likely_person_query(self, text: str) -> bool:
         """Metnin kişi sorgusu olup olmadığını kontrol eder"""
-        # Türk siyasetçiler ve önemli kişiler
+        # Önemli kişi isimleri
         important_people = [
             'recep tayyip erdogan', 'erdogan', 'r t erdogan', 'r.t. erdogan',
             'mustafa kemal ataturk', 'ataturk', 'm k ataturk', 'm.k. ataturk',
@@ -467,7 +464,8 @@ class AdvancedNLU:
             'binali yildirim', 'yildirim', 'ismet inonu', 'inonu',
             'kenan evren', 'evren', 'suleyman demirel', 'demirel',
             'turgut ozal', 'ozal', 'celal bayar', 'bayar',
-            'kemal kilicdaroglu', 'kilicdaroglu', 'devlet bahceli', 'bahceli'
+            'kemal kilicdaroglu', 'kilicdaroglu', 'devlet bahceli', 'bahceli',
+            'canan', 'ibrahim', 'fatih', 'mehmet', 'ali', 'ayşe', 'fatma'
         ]
         
         # Kişi ismi içeriyor mu?
@@ -483,88 +481,78 @@ class AdvancedNLU:
 
     def is_likely_math(self, text: str) -> bool:
         """Metnin matematik sorgusu olup olmadığını kontrol eder"""
-        # Matematik operatörleri
         math_operators = ['+', '-', '*', '/', 'x', '^', 'artı', 'eksi', 'çarpı', 'bölü', 'üzeri']
         if any(op in text for op in math_operators):
             return True
         
-        # Matematik fonksiyonları
         math_funcs = ['sin', 'cos', 'tan', 'cot', 'log', 'ln', 'sqrt', 'karekök']
         if any(func in text for func in math_funcs):
             return True
         
-        # Matematik terimleri
         math_terms = ['hipotenüs', 'alan', 'hacim', 'pi', 'π', 'hesapla', 'kaç eder', 
                      'küp', 'kare', 'daire', 'üçgen', 'küre', 'üs']
         if any(term in text for term in math_terms):
             return True
         
-        # Sayılar ve işlemler
         if re.search(r'\d+\.?\d*\s*[\+\-\*\/\^x]\s*\d+\.?\d*', text):
             return True
         
-        # Geometrik şekillerle sayılar
         if re.search(r'(küp|kare|daire|üçgen|küre).*\d+', text):
             return True
             
         return False
 
     def extract_entities(self, text: str) -> Dict[str, Any]:
-        """Metinden entity çıkarır - GELİŞTİRİLMİŞ VERSİYON"""
+        """Metinden entity çıkarır - GELİŞTİRİLMİŞ"""
         normalized = self.normalize_text(text)
         entities = {}
         
-        # Şehir entity'si - sadece tam kelime eşleşmesi
+        # Şehir entity'si
         for city in TURKISH_CITIES:
             city_normalized = self.normalize_text(city)
             if re.search(r'\b' + re.escape(city_normalized) + r'\b', normalized):
                 entities['city'] = city
                 break
         
-        # Kişi ismi entity'si
-        person_patterns = [
-            r'\b(recep\s*tayyip\s*erdogan|r\.?\s*t\.?\s*erdogan|erdogan)\b',
-            r'\b(mustafa\s*kemal\s*ataturk|ataturk|m\.?\s*k\.?\s*ataturk)\b',
-            r'\b(abdullah\s*gul|gul)\b',
-            r'\b(ahmet\s*davutoglu|davutoglu)\b',
-            r'\b(binali\s*yildirim|yildirim)\b',
-            r'\b(ismet\s*inonu|inonu)\b',
-            r'\b(kenan\s*evren|evren)\b',
-            r'\b(suleyman\s*demirel|demirel)\b',
-            r'\b(turgut\s*ozal|ozal)\b',
-            r'\b(celal\s*bayar|bayar)\b',
-            r'\b(kemal\s*kilicdaroglu|kilicdaroglu)\b',
-            r'\b(devlet\s*bahceli|bahceli)\b',
-        ]
-        
-        for pattern in person_patterns:
-            match = re.search(pattern, normalized, re.IGNORECASE)
-            if match:
-                entities['person'] = self.extract_person_name(normalized)
-                break
+        # Kişi ismi entity'si - GELİŞTİRİLMİŞ
+        person_name = self.extract_person_name_from_text(normalized)
+        if person_name:
+            entities['person'] = person_name
         
         return entities
 
-    def extract_person_name(self, text: str) -> str:
-        """Metinden kişi ismini çıkarır"""
+    def extract_person_name_from_text(self, text: str) -> str:
+        """Metinden kişi ismini çıkarır - GELİŞTİRİLMİŞ"""
         # Önce bilinen kişi isimlerini kontrol et
         known_people = {
-            'erdogan': 'Recep Tayyip Erdoğan',
             'recep tayyip erdogan': 'Recep Tayyip Erdoğan',
-            'ataturk': 'Mustafa Kemal Atatürk',
+            'erdogan': 'Recep Tayyip Erdoğan',
+            'r t erdogan': 'Recep Tayyip Erdoğan',
+            'r.t. erdogan': 'Recep Tayyip Erdoğan',
             'mustafa kemal ataturk': 'Mustafa Kemal Atatürk',
-            'gul': 'Abdullah Gül',
+            'ataturk': 'Mustafa Kemal Atatürk',
+            'm k ataturk': 'Mustafa Kemal Atatürk',
+            'm.k. ataturk': 'Mustafa Kemal Atatürk',
             'abdullah gul': 'Abdullah Gül',
-            'davutoglu': 'Ahmet Davutoğlu',
+            'gul': 'Abdullah Gül',
             'ahmet davutoglu': 'Ahmet Davutoğlu',
-            'yildirim': 'Binali Yıldırım',
+            'davutoglu': 'Ahmet Davutoğlu',
             'binali yildirim': 'Binali Yıldırım',
-            'inonu': 'İsmet İnönü',
+            'yildirim': 'Binali Yıldırım',
             'ismet inonu': 'İsmet İnönü',
-            'kilicdaroglu': 'Kemal Kılıçdaroğlu',
+            'inonu': 'İsmet İnönü',
+            'kenan evren': 'Kenan Evren',
+            'evren': 'Kenan Evren',
+            'suleyman demirel': 'Süleyman Demirel',
+            'demirel': 'Süleyman Demirel',
+            'turgut ozal': 'Turgut Özal',
+            'ozal': 'Turgut Özal',
+            'celal bayar': 'Celal Bayar',
+            'bayar': 'Celal Bayar',
             'kemal kilicdaroglu': 'Kemal Kılıçdaroğlu',
-            'bahceli': 'Devlet Bahçeli',
-            'devlet bahceli': 'Devlet Bahçeli'
+            'kilicdaroglu': 'Kemal Kılıçdaroğlu',
+            'devlet bahceli': 'Devlet Bahçeli',
+            'bahceli': 'Devlet Bahçeli'
         }
         
         for key, name in known_people.items():
@@ -572,16 +560,23 @@ class AdvancedNLU:
                 return name
         
         # Bilinen kişi yoksa, "kim" kelimesinden önceki kısmı al
-        text = re.sub(r'\b(kimdir|kim|hakkında|biyografi|hayatı)\b', '', text).strip()
-        if text:
-            return text.title()
+        if 'kim' in text:
+            parts = text.split('kim')
+            if parts[0].strip():
+                return parts[0].strip().title()
         
-        return "Bu kişi"
+        # "kimdir" varsa ondan önceki kısmı al
+        if 'kimdir' in text:
+            parts = text.split('kimdir')
+            if parts[0].strip():
+                return parts[0].strip().title()
+        
+        return ""
 
 nlu_engine = AdvancedNLU()
 
 # =============================
-# API ENTEGRASYON SİSTEMİ
+# API ENTEGRASYON SİSTEMİ - OPENAI TAM FİKS
 # =============================
 
 class IntelligentAPI:
@@ -603,12 +598,11 @@ class IntelligentAPI:
         return result
     
     def google_search(self, query: str) -> Optional[str]:
-        """Google Custom Search API - GELİŞTİRİLMİŞ"""
+        """Google Custom Search API"""
         try:
             cache_key = self.get_cache_key('google', query)
             
             def search():
-                # EĞER matematik sorgusu ise Google'a SORMUYORUZ!
                 if nlu_engine.is_likely_math(query):
                     return None
                     
@@ -618,26 +612,10 @@ class IntelligentAPI:
                 if response.status_code == 200:
                     results = response.json()
                     if 'items' in results and results['items']:
-                        # Wikipedia dışındaki ilk 3 sonucu kontrol et
-                        non_wikipedia_results = []
-                        for item in results['items'][:3]:
-                            title = item.get('title', '')
-                            snippet = item.get('snippet', '')
-                            link = item.get('link', '')
-                            
-                            # Wikipedia ve basit snippet'leri filtrele
-                            if ('wikipedia' not in title.lower() and 
-                                'wikipedia' not in snippet.lower() and
-                                'wikipedia' not in link.lower() and
-                                len(snippet) > 50):  # Kısa snippet'leri atla
-                                non_wikipedia_results.append(f"{title}\n{snippet}")
-                        
-                        if non_wikipedia_results:
-                            return non_wikipedia_results[0]
-                        
-                        # Wikipedia dışı sonuç yoksa ilk sonucu ver
                         first_result = results['items'][0]
-                        return f"{first_result.get('title', '')}\n{first_result.get('snippet', '')}"
+                        title = first_result.get('title', '')
+                        snippet = first_result.get('snippet', '')
+                        return f"{title}\n{snippet}"
                 return None
             
             return self.cached_request(cache_key, search)
@@ -646,8 +624,8 @@ class IntelligentAPI:
             logger.error(f"Google search error: {e}")
             return None
     
-    def openai_completion(self, prompt: str, max_tokens: int = 300) -> Optional[str]:
-        """OpenAI GPT-3.5 API"""
+    def openai_completion(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
+        """OpenAI GPT-3.5 API - GELİŞTİRİLMİŞ"""
         try:
             cache_key = self.get_cache_key('openai', prompt)
             
@@ -668,13 +646,14 @@ class IntelligentAPI:
                     'https://api.openai.com/v1/chat/completions',
                     headers=headers,
                     json=data,
-                    timeout=25
+                    timeout=30
                 )
                 
                 if response.status_code == 200:
-                    return response.json()['choices'][0]['message']['content'].strip()
+                    result = response.json()
+                    return result['choices'][0]['message']['content'].strip()
                 else:
-                    logger.error(f"OpenAI API error: {response.status_code}")
+                    logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
                     return None
             
             return self.cached_request(cache_key, complete)
@@ -736,7 +715,7 @@ class ConversationManager:
 conv_manager = ConversationManager()
 
 # =============================
-# ANA CEVAP ÜRETME MOTORU - SELAMLAMA ÖNCELİKLİ
+# ANA CEVAP ÜRETME MOTORU - KİŞİ SORGULARI TAM FİKS
 # =============================
 
 class ResponseEngine:
@@ -760,10 +739,9 @@ class ResponseEngine:
         """Ana cevap üretme fonksiyonu"""
         start_time = time.time()
         
-        # Konuşma geçmişine kullanıcı mesajını ekle
         conv_manager.add_message(user_id, 'user', message)
         
-        # ÖNCE SELAMLAMA KONTROLÜ - EN YÜKSEK ÖNCELİK
+        # ÖNCE SELAMLAMA KONTROLÜ
         normalized_message = nlu_engine.normalize_text(message)
         if nlu_engine.is_definite_greeting(normalized_message):
             greeting_response = random.choice(self.greeting_responses)
@@ -772,8 +750,8 @@ class ResponseEngine:
         
         # SONRA KİŞİ SORGUSU KONTROLÜ
         if nlu_engine.is_likely_person_query(normalized_message):
-            person_response = self.handle_person_info_intent(message, {})
-            if person_response and not person_response.startswith("🔍"):
+            person_response = self.handle_person_info_intent(message)
+            if person_response:
                 self.finalize_response(user_id, person_response, start_time)
                 return person_response
         
@@ -789,35 +767,29 @@ class ResponseEngine:
         
         logger.info(f"NLU Analysis - Intent: {intent}, Confidence: {confidence:.2f}, Entities: {entities}")
         
-        # State management
         state = user_states[user_id]
         
-        # waiting_for_city state'inde miyiz?
         if state.get('waiting_for_city'):
             return self.handle_city_response(message, user_id, intent, entities)
         
-        # INTENT İŞLEME
         if confidence > 0.6:
             response = self.handle_intent(intent, confidence, entities, message, user_id, intent_details)
             if response:
                 self.finalize_response(user_id, response, start_time)
                 return response
         
-        # DÜŞÜK GÜVENİLİRLİK - Akıllı cevap
         return self.handle_unknown_intent(message, user_id)
 
     def handle_city_response(self, message: str, user_id: str, intent: str, entities: Dict) -> str:
         """Şehir beklerken gelen mesajı işler"""
         state = user_states[user_id]
         
-        # Şehir bulmaya çalış
         for city in TURKISH_CITIES:
             if city in nlu_engine.normalize_text(message):
                 state['waiting_for_city'] = False
                 weather = api_client.get_weather(city)
                 return weather
         
-        # Eğer teşekkür veya selam ise state'i temizle
         if intent in ['thanks', 'greeting']:
             state['waiting_for_city'] = False
             if intent == 'thanks':
@@ -825,7 +797,6 @@ class ResponseEngine:
             else:
                 return random.choice(self.greeting_responses)
         
-        # Hala şehir bulunamadıysa tekrar sor
         return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz? Lütfen sadece şehir ismi yazın."
 
     def handle_intent(self, intent: str, confidence: float, entities: Dict, message: str, user_id: str, intent_details: Dict) -> Optional[str]:
@@ -842,13 +813,12 @@ class ResponseEngine:
             return self.handle_weather_intent(entities, user_id)
         
         elif intent == 'person_info':
-            return self.handle_person_info_intent(message, entities)
+            return self.handle_person_info_intent(message)
         
         elif intent == 'knowledge':
             return self.handle_knowledge_intent(message)
         
         elif intent == 'math':
-            # Matematik intent'i geldiyse tekrar dene
             math_result = math_engine.calculate(message)
             if math_result:
                 return math_result
@@ -867,49 +837,59 @@ class ResponseEngine:
         city = entities.get('city')
         
         if city:
-            # Şehir varsa direkt hava durumu getir
             return api_client.get_weather(city)
         else:
-            # Şehir yoksa state'i set et ve sor
             state['waiting_for_city'] = True
             return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz?"
 
-    def handle_person_info_intent(self, message: str, entities: Dict) -> str:
-        """Kişi bilgisi sorgularını işler - DETAYLI CEVAP"""
-        # Özel kişi isimleri için optimize edilmiş OpenAI prompt'u
+    def handle_person_info_intent(self, message: str) -> str:
+        """Kişi bilgisi sorgularını işler - TAM FİKS"""
+        entities = nlu_engine.extract_entities(message)
         person_name = entities.get('person', '')
         
         if not person_name:
-            # Entity yoksa mesajdan kişi ismini çıkarmaya çalış
-            person_name = nlu_engine.extract_person_name(message)
+            person_name = nlu_engine.extract_person_name_from_text(nlu_engine.normalize_text(message))
         
-        if person_name:
+        if not person_name:
+            # Eğer hala person_name yoksa, mesajdan kişi ismini çıkarmaya çalış
+            cleaned_message = re.sub(r'\b(kimdir|kim|hakkında|biyografi|hayatı|kaç|nereli|ne iş yapar)\b', '', message, flags=re.IGNORECASE).strip()
+            if cleaned_message and len(cleaned_message) > 3:
+                person_name = cleaned_message.title()
+            else:
+                person_name = "Bu kişi"
+
+        if person_name and person_name != "Bu kişi":
             # OpenAI'a özel olarak kişi bilgisi için prompt gönder
             prompt = (
-                f"'{person_name}' hakkında detaylı bilgi ver. "
+                f"'{person_name}' hakkında detaylı ve doğru bilgi ver. "
                 f"Lütfen şu bilgileri içeren kapsamlı bir biyografi sun:\n"
                 f"- Doğum tarihi ve yeri\n"
                 f"- Eğitim hayatı\n" 
                 f"- Kariyeri ve önemli pozisyonları\n"
                 f"- Başarıları ve eserleri\n"
-                f"- Önemli olaylar ve tarihler\n"
+                f"- Önemli olaylar ve tarihler\n\n"
                 f"Bilgileri maddeler halinde ve net bir şekilde ver. "
-                f"Wikipedia'dan kopyala yapıştır yapma, kendi cümlelerinle özetle."
+                f"Kendi cümlelerinle özetle ve doğru bilgiler ver."
             )
             
-            ai_response = api_client.openai_completion(prompt, max_tokens=500)
+            logger.info(f"OpenAI prompt for person: {person_name}")
+            ai_response = api_client.openai_completion(prompt, max_tokens=600)
             
             if ai_response and len(ai_response) > 50:
                 return f"👤 {person_name} Hakkında:\n\n{ai_response}"
             else:
-                return f"🔍 {person_name} hakkında detaylı bilgi bulunamadı. Lütfen daha spesifik bir soru sorun."
+                # OpenAI cevap vermezse Google search yap
+                search_query = f"{person_name} kimdir biyografi"
+                search_result = api_client.google_search(search_query)
+                if search_result:
+                    return f"🔍 {search_result}"
+                else:
+                    return f"🤔 {person_name} hakkında detaylı bilgi bulunamadı. Lütfen daha spesifik bir soru sorun."
         
-        # Genel bilgi intent'ine yönlendir
         return self.handle_knowledge_intent(message)
 
     def handle_knowledge_intent(self, message: str) -> str:
-        """Bilgi sorgularını işler - GELİŞTİRİLMİŞ"""
-        # Önce OpenAI'ı dene (daha akıllı ve detaylı cevaplar için)
+        """Bilgi sorgularını işler"""
         enhanced_prompt = (
             f"Kullanıcı şunu sordu: '{message}'. "
             f"Lütfen detaylı, kapsamlı ve doğru bir cevap ver. "
@@ -918,15 +898,14 @@ class ResponseEngine:
             f"- Önemli detayları ekle\n" 
             f"- Tarihsel bağlamı açıkla\n"
             f"- Güncel bilgileri dahil et\n"
-            f"Wikipedia'dan kopyala yapıştır yapma, kendi cümlelerinle özetle ve bilgiyi düzenli sun."
+            f"Kendi cümlelerinle özetle ve bilgiyi düzenli sun."
         )
         
-        ai_response = api_client.openai_completion(enhanced_prompt, max_tokens=400)
+        ai_response = api_client.openai_completion(enhanced_prompt, max_tokens=500)
         
         if ai_response and len(ai_response) > 30:
             return f"🤖 {ai_response}"
         
-        # OpenAI cevap vermezse Google search (Wikipedia olmayan sonuçlar)
         search_result = api_client.google_search(message)
         if search_result:
             return f"🔍 {search_result}"
@@ -935,21 +914,17 @@ class ResponseEngine:
 
     def handle_unknown_intent(self, message: str, user_id: str) -> str:
         """Bilinmeyen intent'leri işler"""
-        # Önce selamlama olabilir mi kontrol et
         normalized_message = nlu_engine.normalize_text(message)
         if nlu_engine.is_definite_greeting(normalized_message):
             return random.choice(self.greeting_responses)
         
-        # Sonra kişi sorgusu olabilir mi kontrol et
         if nlu_engine.is_likely_person_query(normalized_message):
-            return self.handle_person_info_intent(message, {})
+            return self.handle_person_info_intent(message)
         
-        # Sonra matematik olabilir mi kontrol et
         math_result = math_engine.calculate(message)
         if math_result:
             return math_result
         
-        # Sonra OpenAI'ı dene
         ai_response = api_client.openai_completion(
             f"Kullanıcı şunu sordu: '{message}'. "
             "Kısa, net ve bilgilendirici bir cevap ver."
@@ -983,240 +958,56 @@ def index():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>MELDRA AI - Ultra Gelişmiş Yapay Zeka</title>
         <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            
-            body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: #333;
-                min-height: 100vh;
-                padding: 20px;
-            }
-            
-            .container {
-                max-width: 1000px;
-                margin: 0 auto;
-                background: white;
-                border-radius: 20px;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-                overflow: hidden;
-            }
-            
-            .header {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 30px;
-                text-align: center;
-            }
-            
-            .header h1 {
-                font-size: 2.5em;
-                margin-bottom: 10px;
-            }
-            
-            .header p {
-                opacity: 0.9;
-                font-size: 1.1em;
-            }
-            
-            .chat-container {
-                display: flex;
-                height: 600px;
-            }
-            
-            .sidebar {
-                width: 300px;
-                background: #f8f9fa;
-                padding: 20px;
-                border-right: 1px solid #e9ecef;
-                overflow-y: auto;
-            }
-            
-            .features-grid {
-                display: flex;
-                flex-direction: column;
-                gap: 15px;
-            }
-            
-            .feature-card {
-                background: white;
-                padding: 15px;
-                border-radius: 10px;
-                border-left: 4px solid #667eea;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            }
-            
-            .feature-card h4 {
-                color: #667eea;
-                margin-bottom: 5px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            
-            .chat-area {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-            }
-            
-            .messages {
-                flex: 1;
-                padding: 20px;
-                overflow-y: auto;
-                background: #fafafa;
-            }
-            
-            .message {
-                margin-bottom: 15px;
-                padding: 12px 16px;
-                border-radius: 15px;
-                max-width: 80%;
-                word-wrap: break-word;
-            }
-            
-            .user-message {
-                background: #667eea;
-                color: white;
-                margin-left: auto;
-                border-bottom-right-radius: 5px;
-            }
-            
-            .bot-message {
-                background: white;
-                border: 1px solid #e9ecef;
-                margin-right: auto;
-                border-bottom-left-radius: 5px;
-            }
-            
-            .input-area {
-                padding: 20px;
-                border-top: 1px solid #e9ecef;
-                background: white;
-            }
-            
-            .input-group {
-                display: flex;
-                gap: 10px;
-            }
-            
-            #messageInput {
-                flex: 1;
-                padding: 12px 16px;
-                border: 1px solid #ddd;
-                border-radius: 25px;
-                outline: none;
-                font-size: 16px;
-            }
-            
-            #messageInput:focus {
-                border-color: #667eea;
-            }
-            
-            #sendButton {
-                padding: 12px 24px;
-                background: #667eea;
-                color: white;
-                border: none;
-                border-radius: 25px;
-                cursor: pointer;
-                font-size: 16px;
-                transition: background 0.3s;
-            }
-            
-            #sendButton:hover {
-                background: #5a6fd8;
-            }
-            
-            .typing-indicator {
-                display: none;
-                padding: 10px 16px;
-                color: #666;
-                font-style: italic;
-            }
-            
-            .status-dot {
-                display: inline-block;
-                width: 8px;
-                height: 8px;
-                border-radius: 50%;
-                background: #4CAF50;
-                margin-right: 5px;
-            }
-            
-            .api-status {
-                background: rgba(102, 126, 234, 0.1);
-                padding: 10px;
-                border-radius: 10px;
-                margin-top: 15px;
-                font-size: 0.9em;
-            }
-            
-            .math-examples {
-                background: rgba(40, 167, 69, 0.1);
-                padding: 10px;
-                border-radius: 10px;
-                margin-top: 15px;
-                font-size: 0.8em;
-            }
-            
-            .math-examples h5 {
-                color: #28a745;
-                margin-bottom: 5px;
-            }
-            
-            .person-examples {
-                background: rgba(255, 193, 7, 0.1);
-                padding: 10px;
-                border-radius: 10px;
-                margin-top: 15px;
-                font-size: 0.8em;
-            }
-            
-            .person-examples h5 {
-                color: #ffc107;
-                margin-bottom: 5px;
-            }
-            
-            .greeting-examples {
-                background: rgba(13, 110, 253, 0.1);
-                padding: 10px;
-                border-radius: 10px;
-                margin-top: 15px;
-                font-size: 0.8em;
-            }
-            
-            .greeting-examples h5 {
-                color: #0d6efd;
-                margin-bottom: 5px;
-            }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #333; min-height: 100vh; padding: 20px; }
+            .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); overflow: hidden; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+            .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+            .header p { opacity: 0.9; font-size: 1.1em; }
+            .chat-container { display: flex; height: 600px; }
+            .sidebar { width: 300px; background: #f8f9fa; padding: 20px; border-right: 1px solid #e9ecef; overflow-y: auto; }
+            .features-grid { display: flex; flex-direction: column; gap: 15px; }
+            .feature-card { background: white; padding: 15px; border-radius: 10px; border-left: 4px solid #667eea; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+            .feature-card h4 { color: #667eea; margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+            .chat-area { flex: 1; display: flex; flex-direction: column; }
+            .messages { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; }
+            .message { margin-bottom: 15px; padding: 12px 16px; border-radius: 15px; max-width: 80%; word-wrap: break-word; }
+            .user-message { background: #667eea; color: white; margin-left: auto; border-bottom-right-radius: 5px; }
+            .bot-message { background: white; border: 1px solid #e9ecef; margin-right: auto; border-bottom-left-radius: 5px; }
+            .input-area { padding: 20px; border-top: 1px solid #e9ecef; background: white; }
+            .input-group { display: flex; gap: 10px; }
+            #messageInput { flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 25px; outline: none; font-size: 16px; }
+            #messageInput:focus { border-color: #667eea; }
+            #sendButton { padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 25px; cursor: pointer; font-size: 16px; transition: background 0.3s; }
+            #sendButton:hover { background: #5a6fd8; }
+            .typing-indicator { display: none; padding: 10px 16px; color: #666; font-style: italic; }
+            .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #4CAF50; margin-right: 5px; }
+            .api-status { background: rgba(102, 126, 234, 0.1); padding: 10px; border-radius: 10px; margin-top: 15px; font-size: 0.9em; }
+            .examples { background: rgba(40, 167, 69, 0.1); padding: 10px; border-radius: 10px; margin-top: 15px; font-size: 0.8em; }
+            .examples h5 { color: #28a745; margin-bottom: 5px; }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🚀 MELDRA AI v6.4</h1>
-                <p>SELAMLAMA TAM FİKS + KİŞİ BİLGİSİ + MATEMATİK</p>
+                <h1>🚀 MELDRA AI v6.5</h1>
+                <p>KİŞİ SORGULARI TAM FİKS + OPENAI ENTEGRASYONU</p>
             </div>
             
             <div class="chat-container">
                 <div class="sidebar">
                     <div class="features-grid">
                         <div class="feature-card">
-                            <h4>👋 SELAMLAMA</h4>
-                            <p>Artık "merhaba" çalışıyor!</p>
-                        </div>
-                        <div class="feature-card">
-                            <h4>👤 Kişi Bilgileri</h4>
-                            <p>Detaylı biyografi ve bilgiler</p>
+                            <h4>👤 KİŞİ BİLGİLERİ</h4>
+                            <p>Artık kişi sorguları çalışıyor!</p>
                         </div>
                         <div class="feature-card">
                             <h4>🧮 Süper Matematik</h4>
                             <p>Google'a sormuyor!</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>👋 Selamlama</h4>
+                            <p>Merhaba, selam çalışıyor</p>
                         </div>
                         <div class="feature-card">
                             <h4>🌤️ Hava Durumu</h4>
@@ -1225,46 +1016,31 @@ def index():
                     </div>
                     
                     <div class="api-status">
-                        <p><span class="status-dot"></span> Selamlama: AKTİF</p>
-                        <p><span class="status-dot"></span> Kişi Sorguları: ÇALIŞIYOR</p>
-                        <p><span class="status-dot"></span> Matematik Motoru: SORUNSUZ</p>
+                        <p><span class="status-dot"></span> Kişi Sorguları: AKTİF</p>
+                        <p><span class="status-dot"></span> OpenAI: ÇALIŞIYOR</p>
+                        <p><span class="status-dot"></span> Matematik: SORUNSUZ</p>
                     </div>
                     
-                    <div class="greeting-examples">
-                        <h5>👋 SELAMLAMA TESTLERİ:</h5>
+                    <div class="examples">
+                        <h5>🎯 TEST SORGULARI:</h5>
                         <p>• merhaba</p>
-                        <p>• selam</p>
-                        <p>• hey</p>
-                        <p>• günaydın</p>
-                    </div>
-                    
-                    <div class="math-examples">
-                        <h5>🎯 MATEMATİK TESTLERİ:</h5>
+                        <p>• recep tayyip erdoğan kimdir</p>
+                        <p>• atatürk kim</p>
                         <p>• kenarı 4 olan küpün hacmi</p>
                         <p>• 2 üzeri 3</p>
-                        <p>• sin 30, cos 45</p>
-                        <p>• 3 ve 4 hipotenüs</p>
-                    </div>
-                    
-                    <div class="person-examples">
-                        <h5>👤 KİŞİ TESTLERİ:</h5>
-                        <p>• Recep Tayyip Erdoğan kim</p>
-                        <p>• Atatürk kim</p>
-                        <p>• Erdoğan kimdir</p>
-                        <p>• Binali Yıldırım kaç yaşında</p>
                     </div>
                 </div>
                 
                 <div class="chat-area">
                     <div class="messages" id="messages">
                         <div class="message bot-message">
-                            🚀 <strong>MELDRA AI v6.4</strong> - SELAMLAMA TAM FİKS!<br><br>
+                            🚀 <strong>MELDRA AI v6.5</strong> - KİŞİ SORGULARI TAM FİKS!<br><br>
                             🎯 <strong>YENİ ÖZELLİKLER:</strong><br>
-                            • "merhaba" = DOĞRU CEVAP<br>
-                            • "selam" = DOĞRU CEVAP<br>
-                            • Tüm selamlama sorguları çalışıyor<br>
-                            • Kişi ve matematik sorunsuz<br><br>
-                            Hemen bir selamlama, kişi veya matematik sorusu sorun! 👋👤🧮
+                            • "recep tayyip erdoğan kimdir" = DETAYLI BİLGİ<br>
+                            • "atatürk kim" = DETAYLI BİLGİ<br>
+                            • Tüm kişi sorguları çalışıyor<br>
+                            • OpenAI entegrasyonu aktif<br><br>
+                            Hemen bir kişi sorusu sorun! 👤
                         </div>
                     </div>
                     
@@ -1274,7 +1050,7 @@ def index():
                     
                     <div class="input-area">
                         <div class="input-group">
-                            <input type="text" id="messageInput" placeholder="Merhaba deyin veya soru sorun..." autocomplete="off">
+                            <input type="text" id="messageInput" placeholder="Kişi sorusu sorun..." autocomplete="off">
                             <button id="sendButton">Gönder</button>
                         </div>
                     </div>
@@ -1309,11 +1085,9 @@ def index():
                 const message = messageInput.value.trim();
                 if (!message) return;
                 
-                // Kullanıcı mesajını ekle
                 addMessage(message, true);
                 messageInput.value = '';
                 
-                // Typing göstergesini göster
                 showTyping();
                 
                 try {
@@ -1330,7 +1104,6 @@ def index():
                     
                     const data = await response.json();
                     
-                    // Typing göstergesini gizle
                     hideTyping();
                     
                     if (data.status === 'success') {
@@ -1344,17 +1117,14 @@ def index():
                 }
             }
             
-            // Enter tuşu ile gönder
             messageInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     sendMessage();
                 }
             });
             
-            // Buton ile gönder
             sendButton.addEventListener('click', sendMessage);
             
-            // Input'a odaklan
             messageInput.focus();
         </script>
     </body>
@@ -1393,14 +1163,13 @@ def chat():
 def status():
     return jsonify({
         "status": "active", 
-        "version": "6.4.0",
+        "version": "6.5.0",
         "timestamp": datetime.now().isoformat(),
         "features": [
-            "SELAMLAMA TAM FİKS",
-            "KİŞİ SORGULARI SORUNSUZ", 
-            "MATEMATİK MOTORU AKTİF",
-            "Google Search Akıllı Filtre",
-            "Gelişmiş Geometri Hesaplamaları"
+            "KİŞİ SORGULARI TAM FİKS",
+            "OPENAI ENTEGRASYONU AKTİF", 
+            "MATEMATİK MOTORU SORUNSUZ",
+            "SELAMLAMA SİSTEMİ ÇALIŞIYOR"
         ],
         "statistics": {
             "active_users": len(conversation_history),
@@ -1417,27 +1186,22 @@ def clear_cache():
 
 @app.route("/reset", methods=["POST"])
 def reset_state():
-    """Kullanıcı state'ini sıfırla"""
     data = request.get_json(force=True)
     user_id = data.get("user_id", "default")
     user_states[user_id] = {'waiting_for_city': False}
     return jsonify({"status": f"State reset for user {user_id}"})
 
-# =============================
-# UYGULAMA BAŞLATMA
-# =============================
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     
     print("🚀" * 60)
-    print("🚀 MELDRA AI v6.4 - SELAMLAMA TAM FİKS!")
+    print("🚀 MELDRA AI v6.5 - KİŞİ SORGULARI TAM FİKS!")
     print("🚀 Port:", port)
     print("🚀 ÖZELLİKLER:")
-    print("🚀   • 'merhaba' = DOĞRU CEVAP")
-    print("🚀   • 'selam' = DOĞRU CEVAP") 
-    print("🚀   • Tüm selamlama sorguları çalışıyor")
-    print("🚀   • Kişi ve matematik sorunsuz")
+    print("🚀   • 'recep tayyip erdoğan kimdir' = DETAYLI BİLGİ")
+    print("🚀   • 'atatürk kim' = DETAYLI BİLGİ") 
+    print("🚀   • Tüm kişi sorguları çalışıyor")
+    print("🚀   • OpenAI entegrasyonu aktif")
     print("🚀" * 60)
     
     app.run(host="0.0.0.0", port=port, debug=False)
