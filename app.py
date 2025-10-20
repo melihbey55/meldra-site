@@ -6,6 +6,7 @@ from datetime import datetime
 import time
 import hashlib
 import logging
+import math
 from typing import Dict, List, Optional, Tuple, Any
 
 # Logging ayarı
@@ -53,6 +54,186 @@ TURKISH_CHAR_MAP = {
 }
 
 # =============================
+# SÜPER GELİŞMİŞ MATEMATİK MOTORU
+# =============================
+
+class SuperMathEngine:
+    def __init__(self):
+        self.number_words = {
+            "sıfır": 0, "bir": 1, "iki": 2, "üç": 3, "dört": 4, "beş": 5,
+            "altı": 6, "yedi": 7, "sekiz": 8, "dokuz": 9, "on": 10,
+            "yirmi": 20, "otuz": 30, "kırk": 40, "elli": 50, "altmış": 60,
+            "yetmiş": 70, "seksen": 80, "doksan": 90,
+            "yüz": 100, "bin": 1000, "milyon": 1000000
+        }
+        
+        self.operation_words = {
+            "artı": "+", "eksi": "-", "çarpı": "*", "bölü": "/", "x": "*", "kere": "*",
+            "üzeri": "**", "karekök": "sqrt", "kare": "**2", "küp": "**3"
+        }
+        
+        self.math_constants = {
+            "pi": str(math.pi), "π": str(math.pi),
+            "e": str(math.e)
+        }
+        
+        self.trig_functions = {
+            "sin": math.sin, "cos": math.cos, "tan": math.tan, "cot": lambda x: 1/math.tan(x),
+            "arcsin": math.asin, "arccos": math.acos, "arctan": math.atan
+        }
+
+    def parse_turkish_number(self, text: str) -> Optional[float]:
+        """Türkçe yazılı sayıları sayıya çevirir"""
+        words = text.lower().split()
+        total = 0
+        current = 0
+        
+        for word in words:
+            if word in self.number_words:
+                value = self.number_words[word]
+                if value >= 100:
+                    if current == 0:
+                        current = 1
+                    current *= value
+                    if value >= 1000:
+                        total += current
+                        current = 0
+                else:
+                    current += value
+            else:
+                # Sayı değilse parsing'i durdur
+                break
+        
+        return total + current if current > 0 else None
+
+    def solve_advanced_math(self, expression: str) -> Optional[str]:
+        """Gelişmiş matematik problemlerini çözer"""
+        expr_lower = expression.lower().replace(' ', '')
+        
+        # Trigonometri fonksiyonları
+        trig_patterns = [
+            (r'sin\(?(\d+)\)?', lambda x: math.sin(math.radians(float(x)))),
+            (r'cos\(?(\d+)\)?', lambda x: math.cos(math.radians(float(x)))),
+            (r'tan\(?(\d+)\)?', lambda x: math.tan(math.radians(float(x)))),
+            (r'cot\(?(\d+)\)?', lambda x: 1/math.tan(math.radians(float(x)))),
+        ]
+        
+        for pattern, func in trig_patterns:
+            match = re.search(pattern, expr_lower)
+            if match:
+                try:
+                    value = float(match.group(1))
+                    result = func(value)
+                    return f"🧮 {expression} = {result:.4f}"
+                except:
+                    pass
+
+        # Hipotenüs hesaplama
+        if 'hipotenüs' in expression.lower() or 'hipotenus' in expression.lower():
+            numbers = re.findall(r'\d+\.?\d*', expression)
+            if len(numbers) >= 2:
+                a, b = map(float, numbers[:2])
+                hipo = math.sqrt(a**2 + b**2)
+                return f"🧮 {a} ve {b} kenarlı üçgenin hipotenüsü = {hipo:.2f}"
+
+        # Alan hesaplamaları
+        if 'alan' in expression.lower():
+            numbers = re.findall(r'\d+\.?\d*', expression)
+            if numbers:
+                if 'kare' in expression.lower():
+                    a = float(numbers[0])
+                    return f"🧮 Kenarı {a} olan karenin alanı = {a**2}"
+                elif 'dikdörtgen' in expression.lower() and len(numbers) >= 2:
+                    a, b = map(float, numbers[:2])
+                    return f"🧮 {a} x {b} dikdörtgenin alanı = {a*b}"
+                elif 'daire' in expression.lower() or 'çember' in expression.lower():
+                    r = float(numbers[0])
+                    return f"🧮 Yarıçapı {r} olan dairenin alanı = {math.pi * r**2:.2f}"
+                elif 'üçgen' in expression.lower() and len(numbers) >= 2:
+                    a, h = map(float, numbers[:2])
+                    return f"🧮 Tabanı {a} ve yüksekliği {h} olan üçgenin alanı = {0.5 * a * h}"
+
+        # Hacim hesaplamaları
+        if 'hacim' in expression.lower():
+            numbers = re.findall(r'\d+\.?\d*', expression)
+            if numbers:
+                if 'küp' in expression.lower():
+                    a = float(numbers[0])
+                    return f"🧮 Kenarı {a} olan küpün hacmi = {a**3}"
+                elif 'küre' in expression.lower():
+                    r = float(numbers[0])
+                    return f"🧮 Yarıçapı {r} olan kürenin hacmi = {(4/3) * math.pi * r**3:.2f}"
+
+        return None
+
+    def calculate_expression(self, expression: str) -> Optional[float]:
+        """Matematik ifadesini güvenli şekilde hesaplar"""
+        try:
+            # Güvenlik kontrolü
+            allowed_chars = set('0123456789+-*/.() ')
+            if all(c in allowed_chars for c in expression.replace(' ', '')):
+                # Basit işlemler için eval
+                result = eval(expression, {"__builtins__": {}}, {})
+                return float(result) if isinstance(result, (int, float)) else None
+        except:
+            pass
+        return None
+
+    def calculate(self, text: str) -> Optional[str]:
+        """Ana matematik hesaplama fonksiyonu"""
+        # Önce gelişmiş matematik problemlerini çöz
+        advanced_result = self.solve_advanced_math(text)
+        if advanced_result:
+            return advanced_result
+
+        # Basit matematik ifadelerini işle
+        text_lower = text.lower()
+        
+        # Türkçe matematik ifadelerini dönüştür
+        math_expr = text_lower
+        for turkish, symbol in self.operation_words.items():
+            math_expr = math_expr.replace(turkish, symbol)
+        
+        for constant, value in self.math_constants.items():
+            math_expr = math_expr.replace(constant, value)
+
+        # Sayıları bul ve işle
+        numbers = re.findall(r'\d+\.?\d*', math_expr)
+        if numbers and any(op in math_expr for op in ['+', '-', '*', '/', '**']):
+            try:
+                result = self.calculate_expression(math_expr)
+                if result is not None:
+                    return f"🧮 {text} = {result}"
+            except:
+                pass
+
+        # Türkçe sayıları işle (örn: "beş artı üç")
+        turkish_ops = ['artı', 'eksi', 'çarpı', 'bölü']
+        if any(op in text_lower for op in turkish_ops):
+            parts = re.split(r'(artı|eksi|çarpı|bölü)', text_lower)
+            if len(parts) == 3:
+                num1_text, op, num2_text = parts
+                num1 = self.parse_turkish_number(num1_text.strip())
+                num2 = self.parse_turkish_number(num2_text.strip())
+                
+                if num1 is not None and num2 is not None:
+                    if 'artı' in op:
+                        return f"🧮 {text} = {num1 + num2}"
+                    elif 'eksi' in op:
+                        return f"🧮 {text} = {num1 - num2}"
+                    elif 'çarpı' in op:
+                        return f"🧮 {text} = {num1 * num2}"
+                    elif 'bölü' in op:
+                        if num2 != 0:
+                            return f"🧮 {text} = {num1 / num2}"
+                        else:
+                            return "❌ Sıfıra bölme hatası!"
+
+        return None
+
+math_engine = SuperMathEngine()
+
+# =============================
 # GELİŞMİŞ NLP MOTORU
 # =============================
 
@@ -78,35 +259,40 @@ class AdvancedNLU:
                 'priority': 10,
                 'keywords': ['nedir', 'kimdir', 'açıkla', 'bilgi', 'anlamı', 'ne demek']
             },
+            'math': {
+                'patterns': [
+                    r'\bhesapla', r'\bkaç\s*eder', r'\btopla', r'\bçıkar', r'\bçarp', r'\bböl',
+                    r'\bartı', r'\beksi', r'\bçarpi', r'\bbölü', r'\bmatematik',
+                    r'\bsin', r'\bcos', r'\btan', r'\bcot', r'\bhipotenüs', r'\balan',
+                    r'\bhacim', r'\bkarekök', r'\bpi\b', r'\bπ\b',
+                    r'\d+\s*[\+\-\*\/]\s*\d+',  # 5+3 gibi ifadeler
+                    r'.*\d+.*[\+\-\*\/].*'      # Sayılar ve operatörler içeren her şey
+                ],
+                'priority': 9,  # Matematik daha yüksek öncelikli
+                'keywords': ['hesapla', 'topla', 'çıkar', 'çarp', 'böl', 'artı', 'eksi', 
+                           'sin', 'cos', 'tan', 'cot', 'hipotenüs', 'alan', 'hacim']
+            },
             'cooking': {
                 'patterns': [
                     r'\btarif', r'\bnasıl\s*yapılır', r'\byapımı', r'\bmalzeme',
                     r'\bpişirme', r'\byemek\s*tarifi'
                 ],
-                'priority': 9,
+                'priority': 7,
                 'keywords': ['tarif', 'yemek', 'nasıl yapılır', 'malzeme']
-            },
-            'math': {
-                'patterns': [
-                    r'\bhesapla', r'\bkaç\s*eder', r'\btopla', r'\bçıkar', r'\bçarp', r'\bböl',
-                    r'\bartı', r'\beksi', r'\bçarpi', r'\bbölü', r'\bmatematik'
-                ],
-                'priority': 8,
-                'keywords': ['hesapla', 'topla', 'çıkar', 'çarp', 'böl']
             },
             'time': {
                 'patterns': [
                     r'\bsaat\s*kaç', r'\bkaç\s*saat', r'\bzaman\s*ne', r'\btarih\s*ne',
                     r'\bgun\s*ne'
                 ],
-                'priority': 7,
+                'priority': 6,
                 'keywords': ['saat', 'zaman', 'tarih']
             },
             'news': {
                 'patterns': [
                     r'\bhaber', r'\bgündem', r'\bson\s*dakika', r'\bgazete', r'\bmanşet'
                 ],
-                'priority': 6,
+                'priority': 5,
                 'keywords': ['haber', 'gündem', 'son dakika']
             },
             'greeting': {
@@ -140,7 +326,14 @@ class AdvancedNLU:
         scores = {}
         intent_details = {}
         
+        # Önce matematik kontrolü (daha agresif)
+        if self.is_likely_math(normalized):
+            scores['math'] = 20  # Yüksek puan
+        
         for intent, data in self.intent_patterns.items():
+            if intent in scores:  # Matematik zaten eklendiyse atla
+                continue
+                
             score = 0
             pattern_matches = []
             keyword_matches = []
@@ -179,6 +372,29 @@ class AdvancedNLU:
         
         return best_intent[0], confidence, intent_details.get(best_intent[0], {})
 
+    def is_likely_math(self, text: str) -> bool:
+        """Metnin matematik sorgusu olup olmadığını kontrol eder"""
+        # Matematik operatörleri
+        math_operators = ['+', '-', '*', '/', 'x', 'artı', 'eksi', 'çarpı', 'bölü']
+        if any(op in text for op in math_operators):
+            return True
+        
+        # Matematik fonksiyonları
+        math_funcs = ['sin', 'cos', 'tan', 'cot', 'log', 'ln', 'sqrt', 'karekök']
+        if any(func in text for func in math_funcs):
+            return True
+        
+        # Matematik terimleri
+        math_terms = ['hipotenüs', 'alan', 'hacim', 'pi', 'π', 'hesapla', 'kaç eder']
+        if any(term in text for term in math_terms):
+            return True
+        
+        # Sayılar ve işlemler
+        if re.search(r'\d+\.?\d*\s*[\+\-\*\/x]\s*\d+\.?\d*', text):
+            return True
+            
+        return False
+
     def extract_entities(self, text: str) -> Dict[str, Any]:
         """Metinden entity çıkarır"""
         normalized = self.normalize_text(text)
@@ -192,16 +408,6 @@ class AdvancedNLU:
                 break
         
         return entities
-
-    def should_handle_as_weather(self, intent: str, entities: Dict, intent_details: Dict) -> bool:
-        """Gerçekten hava durumu sorgusu mu?"""
-        if intent != 'weather':
-            return False
-        
-        if not intent_details.get('pattern_matches') and not intent_details.get('keyword_matches'):
-            return False
-            
-        return True
 
 nlu_engine = AdvancedNLU()
 
@@ -240,7 +446,14 @@ class IntelligentAPI:
                     results = response.json()
                     if 'items' in results and results['items']:
                         first_result = results['items'][0]
-                        return f"{first_result.get('title', '')}\n{first_result.get('snippet', '')}"
+                        title = first_result.get('title', '')
+                        snippet = first_result.get('snippet', '')
+                        # Wikipedia sonuçlarını filtrele
+                        if 'wikipedia' in title.lower() or 'wikipedia' in snippet.lower():
+                            if len(results['items']) > 1:
+                                second_result = results['items'][1]
+                                return f"{second_result.get('title', '')}\n{second_result.get('snippet', '')}"
+                        return f"{title}\n{snippet}"
                 return None
             
             return self.cached_request(cache_key, search)
@@ -317,33 +530,6 @@ class IntelligentAPI:
         except Exception as e:
             logger.error(f"Weather API error: {e}")
             return "🌫️ Hava durumu servisi geçici olarak kullanılamıyor."
-    
-    def get_news(self, category: str = 'general') -> Optional[str]:
-        """NewsAPI"""
-        try:
-            cache_key = self.get_cache_key('news', category)
-            
-            def fetch_news():
-                url = f"https://newsapi.org/v2/top-headlines?country=tr&category={category}&apiKey={NEWS_API_KEY}"
-                response = requests.get(url, timeout=10)
-                
-                if response.status_code == 200:
-                    news_data = response.json()
-                    articles = news_data.get('articles', [])[:5]
-                    
-                    if articles:
-                        news_text = "📰 Son Haberler:\n"
-                        for i, article in enumerate(articles, 1):
-                            title = article['title'].split(' - ')[0]
-                            news_text += f"{i}. {title}\n"
-                        return news_text
-                return None
-            
-            return self.cached_request(cache_key, fetch_news)
-            
-        except Exception as e:
-            logger.error(f"News API error: {e}")
-            return None
 
 api_client = IntelligentAPI()
 
@@ -364,54 +550,6 @@ class ConversationManager:
         })
 
 conv_manager = ConversationManager()
-
-# =============================
-# MATEMATİK MOTORU
-# =============================
-
-class MathEngine:
-    def __init__(self):
-        self.number_words = {
-            "sıfır": 0, "bir": 1, "iki": 2, "üç": 3, "dört": 4, "beş": 5,
-            "altı": 6, "yedi": 7, "sekiz": 8, "dokuz": 9, "on": 10,
-            "yirmi": 20, "otuz": 30, "kırk": 40, "elli": 50, "altmış": 60,
-            "yetmiş": 70, "seksen": 80, "doksan": 90
-        }
-        self.operation_words = {
-            "artı": "+", "eksi": "-", "çarpı": "*", "bölü": "/", "x": "*"
-        }
-    
-    def text_to_math(self, text: str) -> Optional[str]:
-        """Metni matematik ifadesine çevirir"""
-        text = nlu_engine.normalize_text(text)
-        tokens = text.split()
-        math_tokens = []
-        
-        for token in tokens:
-            if token in self.operation_words:
-                math_tokens.append(self.operation_words[token])
-            elif token in self.number_words:
-                math_tokens.append(str(self.number_words[token]))
-            elif token.isdigit():
-                math_tokens.append(token)
-            elif token in ['+', '-', '*', '/', '(', ')']:
-                math_tokens.append(token)
-        
-        return ' '.join(math_tokens) if math_tokens else None
-    
-    def calculate(self, expression: str) -> Optional[float]:
-        """Matematik ifadesini hesaplar"""
-        try:
-            # Güvenli eval
-            allowed_chars = set('0123456789+-*/.() ')
-            if all(c in allowed_chars for c in expression):
-                result = eval(expression, {"__builtins__": {}}, {})
-                return float(result) if isinstance(result, (int, float)) else None
-        except:
-            return None
-        return None
-
-math_engine = MathEngine()
 
 # =============================
 # ANA CEVAP ÜRETME MOTORU
@@ -451,14 +589,20 @@ class ResponseEngine:
         if state.get('waiting_for_city'):
             return self.handle_city_response(message, user_id, intent, entities)
         
-        # INTENT İŞLEME - YÜKSEK GÜVENİLİRLİK GEREKLİ
+        # INTENT İŞLEME - Matematik öncelikli
+        if intent == 'math' or nlu_engine.is_likely_math(message):
+            math_result = self.handle_math_intent(message)
+            if math_result:
+                self.finalize_response(user_id, math_result, start_time)
+                return math_result
+        
         if confidence > 0.7:
             response = self.handle_intent(intent, confidence, entities, message, user_id, intent_details)
             if response:
                 self.finalize_response(user_id, response, start_time)
                 return response
         
-        # DÜŞÜK GÜVENİLİRLİK - Google search veya OpenAI
+        # DÜŞÜK GÜVENİLİRLİK - Akıllı cevap
         return self.handle_unknown_intent(message, user_id)
 
     def handle_city_response(self, message: str, user_id: str, intent: str, entities: Dict) -> str:
@@ -494,17 +638,10 @@ class ResponseEngine:
             return random.choice(self.thanks_responses)
         
         elif intent == 'weather':
-            # ÖNEMLİ: Sadece gerçekten hava durumu sorgusu ise işle
-            if not nlu_engine.should_handle_as_weather(intent, entities, intent_details):
-                return None
-                
             return self.handle_weather_intent(entities, user_id)
         
         elif intent == 'knowledge':
-            return self.handle_knowledge_intent(message, entities)
-        
-        elif intent == 'cooking':
-            return self.handle_cooking_intent(message)
+            return self.handle_knowledge_intent(message)
         
         elif intent == 'math':
             return self.handle_math_intent(message)
@@ -514,10 +651,15 @@ class ResponseEngine:
             days = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
             return f"🕒 {now.strftime('%H:%M:%S')} - {now.strftime('%d/%m/%Y')} {days[now.weekday()]}"
         
-        elif intent == 'news':
-            return self.handle_news_query(entities)
-        
         return None
+
+    def handle_math_intent(self, message: str) -> str:
+        """Matematik sorgularını işler"""
+        result = math_engine.calculate(message)
+        if result:
+            return result
+        
+        return "❌ Matematik işlemini anlayamadım. Lütfen şu şekillerde sorun:\n• '5 + 3' veya '5 artı 3'\n• 'sin 30' veya 'cos 45'\n• '3 ve 4 hipotenüs'\n• 'kenarı 5 olan karenin alanı'"
 
     def handle_weather_intent(self, entities: Dict, user_id: str) -> Optional[str]:
         """Hava durumu sorgularını işler"""
@@ -532,62 +674,33 @@ class ResponseEngine:
             state['waiting_for_city'] = True
             return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz?"
 
-    def handle_knowledge_intent(self, message: str, entities: Dict) -> str:
-        """Bilgi sorgularını işler - Google search"""
+    def handle_knowledge_intent(self, message: str) -> str:
+        """Bilgi sorgularını işler - Önce OpenAI"""
+        # Önce OpenAI'ı dene (daha akıllı cevaplar için)
+        ai_response = api_client.openai_completion(
+            f"Kullanıcı şunu sordu: '{message}'. "
+            "Kısa, net, doğru ve bilgilendirici bir cevap ver. "
+            "Wikipedia'dan kopyala yapıştır yapma, kendi cümlelerinle özetle."
+        )
+        
+        if ai_response and len(ai_response) > 10:
+            return f"🤖 {ai_response}"
+        
+        # OpenAI cevap vermezse Google search (Wikipedia olmayan sonuçlar)
         search_result = api_client.google_search(message)
         if search_result:
             return f"🔍 {search_result}"
-        else:
-            # Google search sonuç vermezse OpenAI'ı dene
-            ai_response = api_client.openai_completion(
-                f"Kullanıcı şunu sordu: '{message}'. "
-                "Kısa, net ve bilgilendirici bir cevap ver."
-            )
-            if ai_response:
-                return ai_response
-            return "🤔 Bu konuda yeterli bilgim bulunmuyor. Lütfen sorunuzu farklı şekilde ifade edin."
-
-    def handle_cooking_intent(self, message: str) -> str:
-        """Yemek tarifi sorgularını işler"""
-        search_result = api_client.google_search(f"{message} tarifi")
-        if search_result:
-            return f"🍳 {search_result}"
-        else:
-            return "🍳 Bu yemek tarifi hakkında detaylı bilgim bulunmuyor."
-
-    def handle_math_intent(self, message: str) -> str:
-        """Matematik sorgularını işler"""
-        math_expression = math_engine.text_to_math(message)
-        if math_expression:
-            result = math_engine.calculate(math_expression)
-            if result is not None:
-                return f"🧮 Hesaplama: {math_expression} = {result}"
         
-        return "❌ Matematik işlemini anlayamadım. Lütfen '5 artı 3' veya '10 çarpı 2' gibi ifadeler kullanın."
-
-    def handle_news_query(self, entities: Dict) -> Optional[str]:
-        """Haber sorgularını işler"""
-        category = 'general'
-        message_lower = nlu_engine.normalize_text(str(entities))
-        
-        if 'spor' in message_lower:
-            category = 'sports'
-        elif 'ekonomi' in message_lower:
-            category = 'business'
-        elif 'teknoloji' in message_lower:
-            category = 'technology'
-        
-        news = api_client.get_news(category)
-        return news if news else "📰 Şu anda haberler alınamıyor."
+        return "🤔 Bu konuda yeterli bilgim bulunmuyor. Lütfen sorunuzu farklı şekilde ifade edin."
 
     def handle_unknown_intent(self, message: str, user_id: str) -> str:
         """Bilinmeyen intent'leri işler"""
-        # Önce Google search dene
-        search_result = api_client.google_search(message)
-        if search_result:
-            return f"🔍 {search_result}"
+        # Önce matematik olabilir mi kontrol et
+        math_result = math_engine.calculate(message)
+        if math_result:
+            return math_result
         
-        # Google search sonuç vermezse OpenAI'ı dene
+        # Sonra OpenAI'ı dene
         ai_response = api_client.openai_completion(
             f"Kullanıcı şunu sordu: '{message}'. "
             "Kısa, net ve bilgilendirici bir cevap ver."
@@ -793,52 +906,75 @@ def index():
                 margin-top: 15px;
                 font-size: 0.9em;
             }
+            
+            .math-examples {
+                background: rgba(40, 167, 69, 0.1);
+                padding: 10px;
+                border-radius: 10px;
+                margin-top: 15px;
+                font-size: 0.8em;
+            }
+            
+            .math-examples h5 {
+                color: #28a745;
+                margin-bottom: 5px;
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🚀 MELDRA AI v5.0</h1>
-                <p>Ultra Gelişmiş Yapay Zeka Asistanı</p>
+                <h1>🚀 MELDRA AI v6.0</h1>
+                <p>Süper Gelişmiş Matematik & Bilgi Asistanı</p>
             </div>
             
             <div class="chat-container">
                 <div class="sidebar">
                     <div class="features-grid">
                         <div class="feature-card">
-                            <h4>🤖 Akıllı Sohbet</h4>
-                            <p>Gelişmiş NLP ile doğal konuşma</p>
+                            <h4>🧮 Süper Matematik</h4>
+                            <p>Trigonometri, geometri, hipotenüs</p>
                         </div>
                         <div class="feature-card">
                             <h4>🌤️ Hava Durumu</h4>
                             <p>Gerçek zamanlı hava bilgileri</p>
                         </div>
                         <div class="feature-card">
-                            <h4>🔍 Google Arama</h4>
-                            <p>Güncel ve doğru bilgiler</p>
+                            <h4>🤖 Akıllı Cevaplar</h4>
+                            <p>OpenAI ile doğru bilgiler</p>
                         </div>
                         <div class="feature-card">
-                            <h4>🧮 Matematik</h4>
-                            <p>Akıllı hesaplamalar</p>
-                        </div>
-                        <div class="feature-card">
-                            <h4>📰 Canlı Haberler</h4>
-                            <p>Son dakika haberleri</p>
+                            <h4>🔍 Akıllı Arama</h4>
+                            <p>Wikipedia yerine özgün cevaplar</p>
                         </div>
                     </div>
                     
                     <div class="api-status">
-                        <p><span class="status-dot"></span> Sistem: Aktif</p>
-                        <p><span class="status-dot"></span> NLP Motoru: Çalışıyor</p>
-                        <p><span class="status-dot"></span> API'ler: Bağlı</p>
+                        <p><span class="status-dot"></span> Matematik Motoru: Aktif</p>
+                        <p><span class="status-dot"></span> Trigonometri: Çalışıyor</p>
+                        <p><span class="status-dot"></span> Geometri: Hazır</p>
+                    </div>
+                    
+                    <div class="math-examples">
+                        <h5>📝 Matematik Örnekleri:</h5>
+                        <p>• 5 + 3 veya 5 artı 3</p>
+                        <p>• sin 30 veya cos 45</p>
+                        <p>• 3 ve 4 hipotenüs</p>
+                        <p>• karenin alanı 5</p>
+                        <p>• dairenin alanı 7</p>
                     </div>
                 </div>
                 
                 <div class="chat-area">
                     <div class="messages" id="messages">
                         <div class="message bot-message">
-                            Merhaba! Ben Meldra, size nasıl yardımcı olabilirim? 🌟<br>
-                            Hava durumu, haberler, hesaplamalar ve daha fazlası için buradayım!
+                            🚀 <strong>MELDRA AI v6.0</strong> - Süper Gelişmiş Sürüm!<br><br>
+                            Artık:<br>
+                            • Trigonometri (sin, cos, tan, cot)<br>
+                            • Geometri (hipotenüs, alan, hacim)<br>
+                            • Matematik işlemleri<br>
+                            • Wikipedia'sız akıllı cevaplar<br><br>
+                            Hemen bir şey sorun! 😊
                         </div>
                     </div>
                     
@@ -848,7 +984,7 @@ def index():
                     
                     <div class="input-area">
                         <div class="input-group">
-                            <input type="text" id="messageInput" placeholder="Meldra'ya bir şey sorun..." autocomplete="off">
+                            <input type="text" id="messageInput" placeholder="Matematik sorusu sorun veya bir şey öğrenin..." autocomplete="off">
                             <button id="sendButton">Gönder</button>
                         </div>
                     </div>
@@ -967,15 +1103,14 @@ def chat():
 def status():
     return jsonify({
         "status": "active", 
-        "version": "5.0.0",
+        "version": "6.0.0",
         "timestamp": datetime.now().isoformat(),
         "features": [
-            "Advanced NLP Engine",
-            "Multi-API Integration", 
-            "Smart State Management",
-            "Real-time Weather",
-            "Google Search",
-            "OpenAI GPT-3.5"
+            "Süper Matematik Motoru",
+            "Trigonometri & Geometri", 
+            "Akıllı Bilgi Sistemi",
+            "Wikipedia Filtreleme",
+            "OpenAI Entegrasyonu"
         ],
         "statistics": {
             "active_users": len(conversation_history),
@@ -1006,14 +1141,14 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     
     print("🚀" * 60)
-    print("🚀 MELDRA AI v5.0 - TÜM SİSTEMLER AKTİF!")
+    print("🚀 MELDRA AI v6.0 - SÜPER MATEMATİK MOTORU AKTİF!")
     print("🚀 Port:", port)
     print("🚀 Özellikler:")
-    print("🚀   • Gelişmiş NLP Motoru")
-    print("🚀   • Çoklu API Entegrasyonu")
-    print("🚀   • Akıllı State Management")
-    print("🚀   • Gerçek Zamanlı Bilgi")
-    print("🚀   • Güzel Sohbet Arayüzü")
+    print("🚀   • Trigonometri (sin, cos, tan, cot)")
+    print("🚀   • Geometri (hipotenüs, alan, hacim)")
+    print("🚀   • Gelişmiş matematik işlemleri")
+    print("🚀   • Wikipedia filtreleme")
+    print("🚀   • OpenAI öncelikli bilgi sistemi")
     print("🚀" * 60)
     
     app.run(host="0.0.0.0", port=port, debug=False)
