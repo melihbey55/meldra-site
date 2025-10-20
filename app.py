@@ -288,12 +288,21 @@ class SuperMathEngine:
 math_engine = SuperMathEngine()
 
 # =============================
-# GELİŞMİŞ NLP MOTORU - KİŞİ SORGULARI ÖNCELİKLİ
+# GELİŞMİŞ NLP MOTORU - SELAMLAMA ÖNCELİKLİ
 # =============================
 
 class AdvancedNLU:
     def __init__(self):
         self.intent_patterns = {
+            'greeting': {
+                'patterns': [
+                    r'^merhaba$', r'^selam$', r'^hey$', r'^hi$', r'^hello$',
+                    r'^günaydın$', r'^iyi\s*günler$', r'^naber$', r'^ne\s*haber$',
+                    r'^merhabalar$', r'^selamlar$', r'^heyyo$', r'^hola$'
+                ],
+                'priority': 25,  # EN YÜKSEK ÖNCELİK
+                'keywords': ['merhaba', 'selam', 'hey', 'hi', 'hello', 'günaydın', 'iyi günler', 'naber']
+            },
             'person_info': {
                 'patterns': [
                     r'\bkimdir\b', r'\bkim\s*dır\b', r'\bkim\s*dir\b', r'\bkim\s*olarak\s*bilinir',
@@ -302,7 +311,7 @@ class AdvancedNLU:
                     r'\bdoğum\s*tarihi', r'\bdoğum\s*yeri', r'\beğitim\s*hayatı',
                     r'\bkariyeri', r'\bbaşarıları', r'\beserleri', r'\bkim\b'
                 ],
-                'priority': 20,  # EN YÜKSEK ÖNCELİK - matematikten bile önce
+                'priority': 20,
                 'keywords': ['kimdir', 'kim', 'biyografi', 'yaş', 'doğum', 'eğitim', 'kariyer', 'hayatı']
             },
             'math': {
@@ -313,7 +322,7 @@ class AdvancedNLU:
                     r'\bhacim', r'\bkarekök', r'\bpi\b', r'\bπ\b', r'\büzeri',
                     r'\bküpün\s*hacmi', r'\bkarenin\s*alanı', r'\bdairenin\s*alanı',
                     r'\büçgenin\s*alanı', r'\bkürenin\s*hacmi',
-                    r'\d+\s*[\+\-\*\/\^]\s*\d+',  # 5+3 gibi ifadeler
+                    r'\d+\s*[\+\-\*\/\^]\s*\d+',
                 ],
                 'priority': 15,
                 'keywords': ['hesapla', 'topla', 'çıkar', 'çarp', 'böl', 'artı', 'eksi', 
@@ -362,38 +371,34 @@ class AdvancedNLU:
                 'priority': 5,
                 'keywords': ['haber', 'gündem', 'son dakika']
             },
-            'greeting': {
-                'patterns': [
-                    r'\bmerhaba', r'\bselam', r'\bhey', r'\bhi\b',
-                    r'\bgünaydın', r'\biyi\s*günler', r'\bnaber', r'\bne\s*haber'
-                ],
-                'priority': 10,
-                'keywords': ['merhaba', 'selam', 'hey', 'hi']
-            },
             'thanks': {
                 'patterns': [
-                    r'\bteşekkür', r'\bsağ\s*ol', r'\bthanks',
-                    r'\beyvallah', r'\bmersi'
+                    r'\bteşekkür', r'\bsağ\s*ol', r'\bthanks', r'\bethank\s*you',
+                    r'\beyvallah', r'\bmersi', r'\btebrik', r'\bharika'
                 ],
                 'priority': 10,
-                'keywords': ['teşekkür', 'sağ ol', 'thanks']
+                'keywords': ['teşekkür', 'sağ ol', 'thanks', 'thank you', 'eyvallah']
             }
         }
 
     def normalize_text(self, text: str) -> str:
         """Türkçe karakterleri normalize eder"""
-        text = text.lower()
+        text = text.lower().strip()
         for old, new in TURKISH_CHAR_MAP.items():
             text = text.replace(old, new)
         return text
 
     def extract_intent(self, text: str) -> Tuple[str, float, Dict]:
-        """Metinden intent çıkarır - KİŞİ SORGULARI ÖNCELİKLİ"""
+        """Metinden intent çıkarır - SELAMLAMA ÖNCELİKLİ"""
         normalized = self.normalize_text(text)
         scores = {}
         intent_details = {}
         
-        # ÖNCE KİŞİ SORGUSU KONTROLÜ - EN YÜKSEK ÖNCELİK
+        # ÖNCE SELAMLAMA KONTROLÜ - EN YÜKSEK ÖNCELİK
+        if self.is_definite_greeting(normalized):
+            scores['greeting'] = 30
+        
+        # SONRA KİŞİ SORGUSU KONTROLÜ
         if self.is_likely_person_query(normalized):
             scores['person_info'] = 25
         
@@ -443,6 +448,15 @@ class AdvancedNLU:
         
         return best_intent[0], confidence, intent_details.get(best_intent[0], {})
 
+    def is_definite_greeting(self, text: str) -> bool:
+        """Kesin selamlama ifadelerini kontrol eder"""
+        definite_greetings = {
+            'merhaba', 'selam', 'hey', 'hi', 'hello', 'hola',
+            'günaydın', 'iyi günler', 'naber', 'ne haber',
+            'merhabalar', 'selamlar', 'heyyo'
+        }
+        return text in definite_greetings
+
     def is_likely_person_query(self, text: str) -> bool:
         """Metnin kişi sorgusu olup olmadığını kontrol eder"""
         # Türk siyasetçiler ve önemli kişiler
@@ -453,8 +467,7 @@ class AdvancedNLU:
             'binali yildirim', 'yildirim', 'ismet inonu', 'inonu',
             'kenan evren', 'evren', 'suleyman demirel', 'demirel',
             'turgut ozal', 'ozal', 'celal bayar', 'bayar',
-            'kemal kilicdaroglu', 'kilicdaroglu', 'devlet bahceli', 'bahceli',
-            'munir', 'ozgur'
+            'kemal kilicdaroglu', 'kilicdaroglu', 'devlet bahceli', 'bahceli'
         ]
         
         # Kişi ismi içeriyor mu?
@@ -522,7 +535,6 @@ class AdvancedNLU:
             r'\b(celal\s*bayar|bayar)\b',
             r'\b(kemal\s*kilicdaroglu|kilicdaroglu)\b',
             r'\b(devlet\s*bahceli|bahceli)\b',
-            r'\b(munir\s*ozgur|ozgur)\b',
         ]
         
         for pattern in person_patterns:
@@ -724,7 +736,7 @@ class ConversationManager:
 conv_manager = ConversationManager()
 
 # =============================
-# ANA CEVAP ÜRETME MOTORU - KİŞİ SORGULARI ÖNCELİKLİ
+# ANA CEVAP ÜRETME MOTORU - SELAMLAMA ÖNCELİKLİ
 # =============================
 
 class ResponseEngine:
@@ -732,13 +744,16 @@ class ResponseEngine:
         self.greeting_responses = [
             "Merhaba! Ben Meldra, size nasıl yardımcı olabilirim? 🌟",
             "Selam! Harika görünüyorsunuz! Size nasıl yardım edebilirim? 😊",
-            "Hey! Meldra burada. Ne yapmak istersiniz? 🚀"
+            "Hey! Meldra burada. Ne yapmak istersiniz? 🚀",
+            "Merhaba! Bugün size nasıl yardımcı olabilirim? 💫",
+            "Selam! Sohbet etmek için hazırım! 🎉"
         ]
         
         self.thanks_responses = [
             "Rica ederim! Size yardımcı olabildiğim için mutluyum! 😊",
             "Ne demek! Her zaman buradayım! 🌟",
-            "Ben teşekkür ederim! Başka bir şeye ihtiyacınız var mı? 🎉"
+            "Ben teşekkür ederim! Başka bir şeye ihtiyacınız var mı? 🎉",
+            "Asıl ben teşekkür ederim! Sorularınız beni geliştiriyor! 💪"
         ]
 
     def generate_response(self, message: str, user_id: str = "default") -> str:
@@ -748,10 +763,17 @@ class ResponseEngine:
         # Konuşma geçmişine kullanıcı mesajını ekle
         conv_manager.add_message(user_id, 'user', message)
         
-        # ÖNCE KİŞİ SORGUSU KONTROLÜ - EN YÜKSEK ÖNCELİK
-        if nlu_engine.is_likely_person_query(message.lower()):
+        # ÖNCE SELAMLAMA KONTROLÜ - EN YÜKSEK ÖNCELİK
+        normalized_message = nlu_engine.normalize_text(message)
+        if nlu_engine.is_definite_greeting(normalized_message):
+            greeting_response = random.choice(self.greeting_responses)
+            self.finalize_response(user_id, greeting_response, start_time)
+            return greeting_response
+        
+        # SONRA KİŞİ SORGUSU KONTROLÜ
+        if nlu_engine.is_likely_person_query(normalized_message):
             person_response = self.handle_person_info_intent(message, {})
-            if person_response and not person_response.startswith("❌"):
+            if person_response and not person_response.startswith("🔍"):
                 self.finalize_response(user_id, person_response, start_time)
                 return person_response
         
@@ -913,8 +935,13 @@ class ResponseEngine:
 
     def handle_unknown_intent(self, message: str, user_id: str) -> str:
         """Bilinmeyen intent'leri işler"""
-        # Önce kişi sorgusu olabilir mi kontrol et
-        if nlu_engine.is_likely_person_query(message.lower()):
+        # Önce selamlama olabilir mi kontrol et
+        normalized_message = nlu_engine.normalize_text(message)
+        if nlu_engine.is_definite_greeting(normalized_message):
+            return random.choice(self.greeting_responses)
+        
+        # Sonra kişi sorgusu olabilir mi kontrol et
+        if nlu_engine.is_likely_person_query(normalized_message):
             return self.handle_person_info_intent(message, {})
         
         # Sonra matematik olabilir mi kontrol et
@@ -1154,21 +1181,38 @@ def index():
                 color: #ffc107;
                 margin-bottom: 5px;
             }
+            
+            .greeting-examples {
+                background: rgba(13, 110, 253, 0.1);
+                padding: 10px;
+                border-radius: 10px;
+                margin-top: 15px;
+                font-size: 0.8em;
+            }
+            
+            .greeting-examples h5 {
+                color: #0d6efd;
+                margin-bottom: 5px;
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🚀 MELDRA AI v6.3</h1>
-                <p>KİŞİ SORGULARI TAM FİKS + MATEMATİK MOTORU</p>
+                <h1>🚀 MELDRA AI v6.4</h1>
+                <p>SELAMLAMA TAM FİKS + KİŞİ BİLGİSİ + MATEMATİK</p>
             </div>
             
             <div class="chat-container">
                 <div class="sidebar">
                     <div class="features-grid">
                         <div class="feature-card">
-                            <h4>👤 KİŞİ BİLGİLERİ</h4>
-                            <p>Artık "kim" sorguları çalışıyor!</p>
+                            <h4>👋 SELAMLAMA</h4>
+                            <p>Artık "merhaba" çalışıyor!</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>👤 Kişi Bilgileri</h4>
+                            <p>Detaylı biyografi ve bilgiler</p>
                         </div>
                         <div class="feature-card">
                             <h4>🧮 Süper Matematik</h4>
@@ -1178,16 +1222,20 @@ def index():
                             <h4>🌤️ Hava Durumu</h4>
                             <p>Gerçek zamanlı hava bilgileri</p>
                         </div>
-                        <div class="feature-card">
-                            <h4>🤖 Akıllı Cevaplar</h4>
-                            <p>OpenAI ile doğru bilgiler</p>
-                        </div>
                     </div>
                     
                     <div class="api-status">
-                        <p><span class="status-dot"></span> Kişi Sorguları: AKTİF</p>
-                        <p><span class="status-dot"></span> Matematik Motoru: ÇALIŞIYOR</p>
-                        <p><span class="status-dot"></span> "kim" Sorguları: TAM FİKS</p>
+                        <p><span class="status-dot"></span> Selamlama: AKTİF</p>
+                        <p><span class="status-dot"></span> Kişi Sorguları: ÇALIŞIYOR</p>
+                        <p><span class="status-dot"></span> Matematik Motoru: SORUNSUZ</p>
+                    </div>
+                    
+                    <div class="greeting-examples">
+                        <h5>👋 SELAMLAMA TESTLERİ:</h5>
+                        <p>• merhaba</p>
+                        <p>• selam</p>
+                        <p>• hey</p>
+                        <p>• günaydın</p>
                     </div>
                     
                     <div class="math-examples">
@@ -1210,13 +1258,13 @@ def index():
                 <div class="chat-area">
                     <div class="messages" id="messages">
                         <div class="message bot-message">
-                            🚀 <strong>MELDRA AI v6.3</strong> - KİŞİ SORGULARI TAM FİKS!<br><br>
+                            🚀 <strong>MELDRA AI v6.4</strong> - SELAMLAMA TAM FİKS!<br><br>
                             🎯 <strong>YENİ ÖZELLİKLER:</strong><br>
-                            • "recep tayyip erdoğan kim" = DETAYLI BİLGİ<br>
-                            • "atatürk kim" = DETAYLI BİLGİ<br>
-                            • Tüm "kim" sorguları çalışıyor<br>
-                            • Matematik motoru sorunsuz<br><br>
-                            Hemen bir kişi veya matematik sorusu sorun! 👤🧮
+                            • "merhaba" = DOĞRU CEVAP<br>
+                            • "selam" = DOĞRU CEVAP<br>
+                            • Tüm selamlama sorguları çalışıyor<br>
+                            • Kişi ve matematik sorunsuz<br><br>
+                            Hemen bir selamlama, kişi veya matematik sorusu sorun! 👋👤🧮
                         </div>
                     </div>
                     
@@ -1226,7 +1274,7 @@ def index():
                     
                     <div class="input-area">
                         <div class="input-group">
-                            <input type="text" id="messageInput" placeholder="Kişi veya matematik sorusu sorun..." autocomplete="off">
+                            <input type="text" id="messageInput" placeholder="Merhaba deyin veya soru sorun..." autocomplete="off">
                             <button id="sendButton">Gönder</button>
                         </div>
                     </div>
@@ -1345,14 +1393,14 @@ def chat():
 def status():
     return jsonify({
         "status": "active", 
-        "version": "6.3.0",
+        "version": "6.4.0",
         "timestamp": datetime.now().isoformat(),
         "features": [
-            "KİŞİ SORGULARI TAM FİKS",
-            "MATEMATİK MOTORU SORUNSUZ", 
+            "SELAMLAMA TAM FİKS",
+            "KİŞİ SORGULARI SORUNSUZ", 
+            "MATEMATİK MOTORU AKTİF",
             "Google Search Akıllı Filtre",
-            "Gelişmiş Geometri Hesaplamaları",
-            "Trigonometri & Üs Alma"
+            "Gelişmiş Geometri Hesaplamaları"
         ],
         "statistics": {
             "active_users": len(conversation_history),
@@ -1383,13 +1431,13 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     
     print("🚀" * 60)
-    print("🚀 MELDRA AI v6.3 - KİŞİ SORGULARI TAM FİKS!")
+    print("🚀 MELDRA AI v6.4 - SELAMLAMA TAM FİKS!")
     print("🚀 Port:", port)
     print("🚀 ÖZELLİKLER:")
-    print("🚀   • 'recep tayyip erdoğan kim' = DETAYLI BİLGİ")
-    print("🚀   • 'atatürk kim' = DETAYLI BİLGİ") 
-    print("🚀   • Tüm 'kim' sorguları çalışıyor")
-    print("🚀   • Matematik motoru sorunsuz")
+    print("🚀   • 'merhaba' = DOĞRU CEVAP")
+    print("🚀   • 'selam' = DOĞRU CEVAP") 
+    print("🚀   • Tüm selamlama sorguları çalışıyor")
+    print("🚀   • Kişi ve matematik sorunsuz")
     print("🚀" * 60)
     
     app.run(host="0.0.0.0", port=port, debug=False)
