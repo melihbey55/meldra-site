@@ -288,7 +288,7 @@ class SuperMathEngine:
 math_engine = SuperMathEngine()
 
 # =============================
-# GELİŞMİŞ NLP MOTORU - MATEMATİK ÖNCELİKLİ
+# GELİŞMİŞ NLP MOTORU - MATEMATİK ÖNCELİKLİ + KİŞİ BİLGİSİ
 # =============================
 
 class AdvancedNLU:
@@ -312,6 +312,26 @@ class AdvancedNLU:
                            'küp', 'kare', 'daire', 'üçgen', 'küre', 'karekök', 'pi',
                            'üzeri', 'üs', 'kere']
             },
+            'person_info': {
+                'patterns': [
+                    r'\bkimdir\b', r'\bkim\s*dır\b', r'\bkim\s*dir\b', r'\bkim\s*olarak\s*bilinir',
+                    r'\bkim\s*denir', r'\bhayatı\s*nedir', r'\bbiografi', r'\bkaç\s*yaşında',
+                    r'\bnereli', r'\bne\s*iş\s*yapar', r'\bmesleği\s*ne',
+                    r'\bdoğum\s*tarihi', r'\bdoğum\s*yeri', r'\beğitim\s*hayatı',
+                    r'\bkariyeri', r'\bbaşarıları', r'\beserleri'
+                ],
+                'priority': 12,  # Yüksek öncelik
+                'keywords': ['kimdir', 'kim', 'biyografi', 'yaş', 'doğum', 'eğitim', 'kariyer']
+            },
+            'knowledge': {
+                'patterns': [
+                    r'\bnedir\b', r'\bne\s*demek', r'\bne\s*anlama\s*gelir', r'\banlamı\s*ne',
+                    r'\baçıkla\b', r'\bbilgi\s*ver', r'\bne\s*demektir',
+                    r'\bhakkında\b', r'\btanım\b', r'\banlam\b', r'\bne\s*denir'
+                ],
+                'priority': 10,
+                'keywords': ['nedir', 'açıkla', 'bilgi', 'anlamı', 'ne demek', 'hakkında']
+            },
             'weather': {
                 'patterns': [
                     r'\bhava\s*durum', r'\bhava\s*kaç', r'\bkaç\s*derece', r'\bsıcaklık\s*kaç',
@@ -320,16 +340,6 @@ class AdvancedNLU:
                 ],
                 'priority': 8,
                 'keywords': ['hava', 'derece', 'sıcaklık', 'nem', 'rüzgar']
-            },
-            'knowledge': {
-                'patterns': [
-                    r'\bnedir\b', r'\bne\s*demek', r'\bne\s*anlama\s*gelir', r'\banlamı\s*ne',
-                    r'\baçıkla\b', r'\bbilgi\s*ver', r'\bne\s*demektir',
-                    r'\bkimdir\b', r'\bkim\s*dır\b', r'\bhakkında\b', r'\bbiografi',
-                    r'\bne\s*iş\s*yapar', r'\bnereli', r'\bkaç\s*yaşında'
-                ],
-                'priority': 10,
-                'keywords': ['nedir', 'kimdir', 'açıkla', 'bilgi', 'anlamı', 'ne demek']
             },
             'cooking': {
                 'patterns': [
@@ -460,7 +470,7 @@ class AdvancedNLU:
         return False
 
     def extract_entities(self, text: str) -> Dict[str, Any]:
-        """Metinden entity çıkarır"""
+        """Metinden entity çıkarır - GELİŞTİRİLMİŞ VERSİYON"""
         normalized = self.normalize_text(text)
         entities = {}
         
@@ -471,7 +481,32 @@ class AdvancedNLU:
                 entities['city'] = city
                 break
         
+        # Kişi ismi entity'si
+        person_patterns = [
+            r'\b(recep\s*tayyip\s*erdogan|r\.?\s*t\.?\s*erdogan|erdogan)\b',
+            r'\b(mustafa\s*kemal\s*ataturk|ataturk|m\.?\s*k\.?\s*ataturk)\b',
+            r'\b(abdullah\s*gul|gul)\b',
+            r'\b(ahmet\s*davutoglu|davutoglu)\b',
+            r'\b(binali\s*yildirim|yildirim)\b',
+            r'\b(ismet\s*inonu|inonu)\b',
+            r'\b(kenan\s*evren|evren)\b',
+            r'\b(suleyman\s*demirel|demirel)\b',
+            r'\b(turgut\s*ozal|ozal)\b',
+            r'\b(celal\s*bayar|bayar)\b',
+        ]
+        
+        for pattern in person_patterns:
+            if re.search(pattern, normalized, re.IGNORECASE):
+                entities['person'] = self.extract_person_name(normalized)
+                break
+        
         return entities
+
+    def extract_person_name(self, text: str) -> str:
+        """Metinden kişi ismini çıkarır"""
+        # Basit bir kişi ismi çıkarımı
+        text = re.sub(r'\b(kimdir|kim|hakkında|biyografi|hayatı)\b', '', text).strip()
+        return text.title()
 
 nlu_engine = AdvancedNLU()
 
@@ -498,7 +533,7 @@ class IntelligentAPI:
         return result
     
     def google_search(self, query: str) -> Optional[str]:
-        """Google Custom Search API"""
+        """Google Custom Search API - GELİŞTİRİLMİŞ"""
         try:
             cache_key = self.get_cache_key('google', query)
             
@@ -513,15 +548,26 @@ class IntelligentAPI:
                 if response.status_code == 200:
                     results = response.json()
                     if 'items' in results and results['items']:
+                        # Wikipedia dışındaki ilk 3 sonucu kontrol et
+                        non_wikipedia_results = []
+                        for item in results['items'][:3]:
+                            title = item.get('title', '')
+                            snippet = item.get('snippet', '')
+                            link = item.get('link', '')
+                            
+                            # Wikipedia ve basit snippet'leri filtrele
+                            if ('wikipedia' not in title.lower() and 
+                                'wikipedia' not in snippet.lower() and
+                                'wikipedia' not in link.lower() and
+                                len(snippet) > 50):  # Kısa snippet'leri atla
+                                non_wikipedia_results.append(f"{title}\n{snippet}")
+                        
+                        if non_wikipedia_results:
+                            return non_wikipedia_results[0]
+                        
+                        # Wikipedia dışı sonuç yoksa ilk sonucu ver
                         first_result = results['items'][0]
-                        title = first_result.get('title', '')
-                        snippet = first_result.get('snippet', '')
-                        # Wikipedia sonuçlarını filtrele
-                        if 'wikipedia' in title.lower() or 'wikipedia' in snippet.lower():
-                            if len(results['items']) > 1:
-                                second_result = results['items'][1]
-                                return f"{second_result.get('title', '')}\n{second_result.get('snippet', '')}"
-                        return f"{title}\n{snippet}"
+                        return f"{first_result.get('title', '')}\n{first_result.get('snippet', '')}"
                 return None
             
             return self.cached_request(cache_key, search)
@@ -620,7 +666,7 @@ class ConversationManager:
 conv_manager = ConversationManager()
 
 # =============================
-# ANA CEVAP ÜRETME MOTORU - MATEMATİK ÖNCELİKLİ
+# ANA CEVAP ÜRETME MOTORU - MATEMATİK ÖNCELİKLİ + KİŞİ BİLGİSİ
 # =============================
 
 class ResponseEngine:
@@ -708,6 +754,9 @@ class ResponseEngine:
         elif intent == 'weather':
             return self.handle_weather_intent(entities, user_id)
         
+        elif intent == 'person_info':
+            return self.handle_person_info_intent(message, entities)
+        
         elif intent == 'knowledge':
             return self.handle_knowledge_intent(message)
         
@@ -738,16 +787,54 @@ class ResponseEngine:
             state['waiting_for_city'] = True
             return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz?"
 
+    def handle_person_info_intent(self, message: str, entities: Dict) -> str:
+        """Kişi bilgisi sorgularını işler - DETAYLI CEVAP"""
+        # Özel kişi isimleri için optimize edilmiş OpenAI prompt'u
+        person_name = entities.get('person', '')
+        
+        if not person_name:
+            # Entity yoksa mesajdan kişi ismini çıkarmaya çalış
+            person_name = nlu_engine.extract_person_name(message)
+        
+        if person_name:
+            # OpenAI'a özel olarak kişi bilgisi için prompt gönder
+            prompt = (
+                f"'{person_name}' hakkında detaylı bilgi ver. "
+                f"Lütfen şu bilgileri içeren kapsamlı bir biyografi sun:\n"
+                f"- Doğum tarihi ve yeri\n"
+                f"- Eğitim hayatı\n" 
+                f"- Kariyeri ve önemli pozisyonları\n"
+                f"- Başarıları ve eserleri\n"
+                f"- Önemli olaylar ve tarihler\n"
+                f"Bilgileri maddeler halinde ve net bir şekilde ver. "
+                f"Wikipedia'dan kopyala yapıştır yapma, kendi cümlelerinle özetle."
+            )
+            
+            ai_response = api_client.openai_completion(prompt, max_tokens=500)
+            
+            if ai_response and len(ai_response) > 50:
+                return f"👤 {person_name} Hakkında:\n\n{ai_response}"
+        
+        # Genel bilgi intent'ine yönlendir
+        return self.handle_knowledge_intent(message)
+
     def handle_knowledge_intent(self, message: str) -> str:
-        """Bilgi sorgularını işler - Önce OpenAI"""
-        # Önce OpenAI'ı dene (daha akıllı cevaplar için)
-        ai_response = api_client.openai_completion(
+        """Bilgi sorgularını işler - GELİŞTİRİLMİŞ"""
+        # Önce OpenAI'ı dene (daha akıllı ve detaylı cevaplar için)
+        enhanced_prompt = (
             f"Kullanıcı şunu sordu: '{message}'. "
-            "Kısa, net, doğru ve bilgilendirici bir cevap ver. "
-            "Wikipedia'dan kopyala yapıştır yapma, kendi cümlelerinle özetle."
+            f"Lütfen detaylı, kapsamlı ve doğru bir cevap ver. "
+            f"Eğer bir kişi, yer, olay veya kavram hakkındaysa:\n"
+            f"- Temel bilgileri ver\n"
+            f"- Önemli detayları ekle\n" 
+            f"- Tarihsel bağlamı açıkla\n"
+            f"- Güncel bilgileri dahil et\n"
+            f"Wikipedia'dan kopyala yapıştır yapma, kendi cümlelerinle özetle ve bilgiyi düzenli sun."
         )
         
-        if ai_response and len(ai_response) > 10:
+        ai_response = api_client.openai_completion(enhanced_prompt, max_tokens=400)
+        
+        if ai_response and len(ai_response) > 30:
             return f"🤖 {ai_response}"
         
         # OpenAI cevap vermezse Google search (Wikipedia olmayan sonuçlar)
@@ -755,7 +842,7 @@ class ResponseEngine:
         if search_result:
             return f"🔍 {search_result}"
         
-        return "🤔 Bu konuda yeterli bilgim bulunmuyor. Lütfen sorunuzu farklı şekilde ifade edin."
+        return "🤔 Bu konuda yeterli bilgim bulunmuyor. Lütfen sorunuzu farklı şekilde ifade edin veya daha spesifik bir soru sorun."
 
     def handle_unknown_intent(self, message: str, user_id: str) -> str:
         """Bilinmeyen intent'leri işler"""
@@ -983,13 +1070,26 @@ def index():
                 color: #28a745;
                 margin-bottom: 5px;
             }
+            
+            .person-examples {
+                background: rgba(255, 193, 7, 0.1);
+                padding: 10px;
+                border-radius: 10px;
+                margin-top: 15px;
+                font-size: 0.8em;
+            }
+            
+            .person-examples h5 {
+                color: #ffc107;
+                margin-bottom: 5px;
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🚀 MELDRA AI v6.1</h1>
-                <p>MATEMATİK MOTORU TAM FİKS - Google Search Engelli</p>
+                <h1>🚀 MELDRA AI v6.2</h1>
+                <p>MATEMATİK MOTORU TAM FİKS + DETAYLI KİŞİ BİLGİLERİ</p>
             </div>
             
             <div class="chat-container">
@@ -1000,6 +1100,10 @@ def index():
                             <p>Artık Google'a sormuyor!</p>
                         </div>
                         <div class="feature-card">
+                            <h4>👤 Kişi Bilgileri</h4>
+                            <p>Detaylı biyografi ve bilgiler</p>
+                        </div>
+                        <div class="feature-card">
                             <h4>🌤️ Hava Durumu</h4>
                             <p>Gerçek zamanlı hava bilgileri</p>
                         </div>
@@ -1007,38 +1111,41 @@ def index():
                             <h4>🤖 Akıllı Cevaplar</h4>
                             <p>OpenAI ile doğru bilgiler</p>
                         </div>
-                        <div class="feature-card">
-                            <h4>🔍 Akıllı Arama</h4>
-                            <p>Wikipedia yerine özgün cevaplar</p>
-                        </div>
                     </div>
                     
                     <div class="api-status">
                         <p><span class="status-dot"></span> Matematik Motoru: AKTİF</p>
-                        <p><span class="status-dot"></span> Google Search: MATEMATİKTE ENGELİ</p>
-                        <p><span class="status-dot"></span> Trigonometri: ÇALIŞIYOR</p>
+                        <p><span class="status-dot"></span> Kişi Bilgisi: DETAYLI</p>
+                        <p><span class="status-dot"></span> Google Search: AKILLI FİLTRE</p>
                     </div>
                     
                     <div class="math-examples">
-                        <h5>🎯 TEST EDİLEN SORULAR:</h5>
+                        <h5>🎯 MATEMATİK TESTLERİ:</h5>
                         <p>• kenarı 4 olan küpün hacmi</p>
                         <p>• 2 üzeri 3</p>
                         <p>• sin 30, cos 45</p>
                         <p>• 3 ve 4 hipotenüs</p>
-                        <p>• karenin alanı 5</p>
+                    </div>
+                    
+                    <div class="person-examples">
+                        <h5>👤 KİŞİ TESTLERİ:</h5>
+                        <p>• Recep Tayyip Erdoğan kimdir</p>
+                        <p>• Atatürk biyografi</p>
+                        <p>• Binali Yıldırım kaç yaşında</p>
+                        <p>• Abdullah Gül nereli</p>
                     </div>
                 </div>
                 
                 <div class="chat-area">
                     <div class="messages" id="messages">
                         <div class="message bot-message">
-                            🚀 <strong>MELDRA AI v6.1</strong> - MATEMATİK TAM FİKS!<br><br>
+                            🚀 <strong>MELDRA AI v6.2</strong> - MATEMATİK + KİŞİ BİLGİSİ TAM FİKS!<br><br>
                             🎯 <strong>YENİ ÖZELLİKLER:</strong><br>
                             • Matematik sorguları ARTIK Google'a gitmiyor<br>
-                            • "kenarı 4 olan küpün hacmi" = 64<br>
-                            • "2 üzeri 3" = 8<br>
+                            • Kişi sorgularında DETAYLI biyografi<br>
+                            • "recep tayyip kimdir" = detaylı bilgi<br>
                             • Tüm geometri ve trigonometri çalışıyor<br><br>
-                            Hemen bir matematik sorusu sorun! 🧮
+                            Hemen bir matematik veya kişi sorusu sorun! 🧮👤
                         </div>
                     </div>
                     
@@ -1048,7 +1155,7 @@ def index():
                     
                     <div class="input-area">
                         <div class="input-group">
-                            <input type="text" id="messageInput" placeholder="Matematik sorusu sorun... (kenarı 4 olan küpün hacmi)" autocomplete="off">
+                            <input type="text" id="messageInput" placeholder="Matematik veya kişi sorusu sorun..." autocomplete="off">
                             <button id="sendButton">Gönder</button>
                         </div>
                     </div>
@@ -1167,11 +1274,12 @@ def chat():
 def status():
     return jsonify({
         "status": "active", 
-        "version": "6.1.0",
+        "version": "6.2.0",
         "timestamp": datetime.now().isoformat(),
         "features": [
             "MATEMATİK MOTORU TAM FİKS",
-            "Google Search Matematikte Engelli", 
+            "DETAYLI KİŞİ BİLGİLERİ", 
+            "Google Search Akıllı Filtre",
             "Gelişmiş Geometri Hesaplamaları",
             "Trigonometri & Üs Alma",
             "Wikipedia Filtreleme"
@@ -1205,12 +1313,13 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     
     print("🚀" * 60)
-    print("🚀 MELDRA AI v6.1 - MATEMATİK MOTORU TAM FİKS!")
+    print("🚀 MELDRA AI v6.2 - MATEMATİK + KİŞİ BİLGİSİ TAM FİKS!")
     print("🚀 Port:", port)
     print("🚀 ÖZELLİKLER:")
     print("🚀   • Matematik sorguları ARTIK Google'a gitmiyor!")
+    print("🚀   • Kişi sorgularında DETAYLI biyografi!")
+    print("🚀   • 'recep tayyip kimdir' = detaylı bilgi")
     print("🚀   • 'kenarı 4 olan küpün hacmi' = 64")
-    print("🚀   • '2 üzeri 3' = 8") 
     print("🚀   • Tüm geometri ve trigonometri çalışıyor")
     print("🚀" * 60)
     
