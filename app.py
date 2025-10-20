@@ -21,10 +21,8 @@ app = Flask(__name__)
 
 # Environment variables'dan API key'leri al
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', '6a7a443921825622e552d0cde2d2b688')
-NEWS_API_KEY = os.environ.get('NEWS_API_KEY', '94ac5f3a6ea34ed0918d28958c7e7aa6')
 GOOGLE_SEARCH_KEY = os.environ.get('GOOGLE_SEARCH_KEY', 'AIzaSyCphCUBFyb0bBVMVG5JupVOjKzoQq33G-c')
 GOOGLE_CX = os.environ.get('GOOGLE_CX', 'd15c352df36b9419f')
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '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')
 
 # =============================
 # GLOBAL DEĞİŞKENLER
@@ -101,7 +99,6 @@ class SuperMathEngine:
                 else:
                     current += value
             else:
-                # Sayı değilse parsing'i durdur
                 break
         
         return total + current if current > 0 else None
@@ -109,7 +106,6 @@ class SuperMathEngine:
     def extract_numbers_from_text(self, text: str) -> List[float]:
         """Metinden sayıları çıkarır"""
         numbers = []
-        # Ondalıklı sayıları ve tam sayıları bul
         matches = re.findall(r'\d+\.?\d*', text)
         for match in matches:
             try:
@@ -200,10 +196,8 @@ class SuperMathEngine:
     def calculate_expression(self, expression: str) -> Optional[float]:
         """Matematik ifadesini güvenli şekilde hesaplar"""
         try:
-            # Güvenlik kontrolü - sadece matematiksel karakterlere izin ver
             allowed_chars = set('0123456789+-*/.() ')
             if all(c in allowed_chars for c in expression.replace(' ', '')):
-                # Basit işlemler için eval
                 result = eval(expression, {"__builtins__": {}}, {})
                 return float(result) if isinstance(result, (int, float)) else None
         except:
@@ -288,7 +282,7 @@ class SuperMathEngine:
 math_engine = SuperMathEngine()
 
 # =============================
-# GELİŞMİŞ NLP MOTORU - KİŞİ SORGULARI TAM FİKS
+# GELİŞMİŞ NLP MOTORU - GOOGLE SEARCH ÖNCELİKLİ
 # =============================
 
 class AdvancedNLU:
@@ -348,14 +342,6 @@ class AdvancedNLU:
                 'priority': 8,
                 'keywords': ['hava', 'derece', 'sıcaklık', 'nem', 'rüzgar']
             },
-            'cooking': {
-                'patterns': [
-                    r'\btarif', r'\bnasıl\s*yapılır', r'\byapımı', r'\bmalzeme',
-                    r'\bpişirme', r'\byemek\s*tarifi'
-                ],
-                'priority': 7,
-                'keywords': ['tarif', 'yemek', 'nasıl yapılır', 'malzeme']
-            },
             'time': {
                 'patterns': [
                     r'\bsaat\s*kaç', r'\bkaç\s*saat', r'\bzaman\s*ne', r'\btarih\s*ne',
@@ -363,13 +349,6 @@ class AdvancedNLU:
                 ],
                 'priority': 6,
                 'keywords': ['saat', 'zaman', 'tarih']
-            },
-            'news': {
-                'patterns': [
-                    r'\bhaber', r'\bgündem', r'\bson\s*dakika', r'\bgazete', r'\bmanşet'
-                ],
-                'priority': 5,
-                'keywords': ['haber', 'gündem', 'son dakika']
             },
             'thanks': {
                 'patterns': [
@@ -456,7 +435,6 @@ class AdvancedNLU:
 
     def is_likely_person_query(self, text: str) -> bool:
         """Metnin kişi sorgusu olup olmadığını kontrol eder"""
-        # Önemli kişi isimleri
         important_people = [
             'recep tayyip erdogan', 'erdogan', 'r t erdogan', 'r.t. erdogan',
             'mustafa kemal ataturk', 'ataturk', 'm k ataturk', 'm.k. ataturk',
@@ -464,16 +442,13 @@ class AdvancedNLU:
             'binali yildirim', 'yildirim', 'ismet inonu', 'inonu',
             'kenan evren', 'evren', 'suleyman demirel', 'demirel',
             'turgut ozal', 'ozal', 'celal bayar', 'bayar',
-            'kemal kilicdaroglu', 'kilicdaroglu', 'devlet bahceli', 'bahceli',
-            'canan', 'ibrahim', 'fatih', 'mehmet', 'ali', 'ayşe', 'fatma'
+            'kemal kilicdaroglu', 'kilicdaroglu', 'devlet bahceli', 'bahceli'
         ]
         
-        # Kişi ismi içeriyor mu?
         for person in important_people:
             if person in text:
                 return True
         
-        # "kim" sorusu var mı?
         if re.search(r'\bkim\b', text) and len(text.split()) <= 5:
             return True
             
@@ -503,7 +478,7 @@ class AdvancedNLU:
         return False
 
     def extract_entities(self, text: str) -> Dict[str, Any]:
-        """Metinden entity çıkarır - GELİŞTİRİLMİŞ"""
+        """Metinden entity çıkarır"""
         normalized = self.normalize_text(text)
         entities = {}
         
@@ -514,7 +489,7 @@ class AdvancedNLU:
                 entities['city'] = city
                 break
         
-        # Kişi ismi entity'si - GELİŞTİRİLMİŞ
+        # Kişi ismi entity'si
         person_name = self.extract_person_name_from_text(normalized)
         if person_name:
             entities['person'] = person_name
@@ -522,8 +497,7 @@ class AdvancedNLU:
         return entities
 
     def extract_person_name_from_text(self, text: str) -> str:
-        """Metinden kişi ismini çıkarır - GELİŞTİRİLMİŞ"""
-        # Önce bilinen kişi isimlerini kontrol et
+        """Metinden kişi ismini çıkarır"""
         known_people = {
             'recep tayyip erdogan': 'Recep Tayyip Erdoğan',
             'erdogan': 'Recep Tayyip Erdoğan',
@@ -559,13 +533,12 @@ class AdvancedNLU:
             if key in text:
                 return name
         
-        # Bilinen kişi yoksa, "kim" kelimesinden önceki kısmı al
+        # "kim" sorguları için isim çıkarımı
         if 'kim' in text:
             parts = text.split('kim')
             if parts[0].strip():
                 return parts[0].strip().title()
         
-        # "kimdir" varsa ondan önceki kısmı al
         if 'kimdir' in text:
             parts = text.split('kimdir')
             if parts[0].strip():
@@ -576,7 +549,7 @@ class AdvancedNLU:
 nlu_engine = AdvancedNLU()
 
 # =============================
-# API ENTEGRASYON SİSTEMİ - OPENAI TAM FİKS
+# API ENTEGRASYON SİSTEMİ - SADECE GOOGLE SEARCH
 # =============================
 
 class IntelligentAPI:
@@ -598,11 +571,12 @@ class IntelligentAPI:
         return result
     
     def google_search(self, query: str) -> Optional[str]:
-        """Google Custom Search API"""
+        """Google Custom Search API - GELİŞTİRİLMİŞ"""
         try:
             cache_key = self.get_cache_key('google', query)
             
             def search():
+                # Matematik sorguları için Google'a sorma
                 if nlu_engine.is_likely_math(query):
                     return None
                     
@@ -612,54 +586,28 @@ class IntelligentAPI:
                 if response.status_code == 200:
                     results = response.json()
                     if 'items' in results and results['items']:
+                        # İlk 3 sonucu birleştir
+                        combined_result = []
+                        for item in results['items'][:3]:
+                            title = item.get('title', '')
+                            snippet = item.get('snippet', '')
+                            
+                            # Wikipedia'dan gelen sonuçları filtrele
+                            if 'wikipedia' not in title.lower() and 'wikipedia' not in snippet.lower():
+                                combined_result.append(f"• {title}\n  {snippet}")
+                        
+                        if combined_result:
+                            return "\n\n".join(combined_result)
+                        
+                        # Eğer Wikipedia dışı sonuç yoksa ilk sonucu ver
                         first_result = results['items'][0]
-                        title = first_result.get('title', '')
-                        snippet = first_result.get('snippet', '')
-                        return f"{title}\n{snippet}"
+                        return f"• {first_result.get('title', '')}\n  {first_result.get('snippet', '')}"
                 return None
             
             return self.cached_request(cache_key, search)
             
         except Exception as e:
             logger.error(f"Google search error: {e}")
-            return None
-    
-    def openai_completion(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
-        """OpenAI GPT-3.5 API - GELİŞTİRİLMİŞ"""
-        try:
-            cache_key = self.get_cache_key('openai', prompt)
-            
-            def complete():
-                headers = {
-                    'Authorization': f'Bearer {OPENAI_API_KEY}',
-                    'Content-Type': 'application/json'
-                }
-                
-                data = {
-                    'model': 'gpt-3.5-turbo',
-                    'messages': [{'role': 'user', 'content': prompt}],
-                    'max_tokens': max_tokens,
-                    'temperature': 0.7
-                }
-                
-                response = requests.post(
-                    'https://api.openai.com/v1/chat/completions',
-                    headers=headers,
-                    json=data,
-                    timeout=30
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    return result['choices'][0]['message']['content'].strip()
-                else:
-                    logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
-                    return None
-            
-            return self.cached_request(cache_key, complete)
-            
-        except Exception as e:
-            logger.error(f"OpenAI error: {e}")
             return None
     
     def get_weather(self, city: str) -> Optional[str]:
@@ -715,7 +663,7 @@ class ConversationManager:
 conv_manager = ConversationManager()
 
 # =============================
-# ANA CEVAP ÜRETME MOTORU - KİŞİ SORGULARI TAM FİKS
+# ANA CEVAP ÜRETME MOTORU - SADECE GOOGLE SEARCH
 # =============================
 
 class ResponseEngine:
@@ -731,8 +679,7 @@ class ResponseEngine:
         self.thanks_responses = [
             "Rica ederim! Size yardımcı olabildiğim için mutluyum! 😊",
             "Ne demek! Her zaman buradayım! 🌟",
-            "Ben teşekkür ederim! Başka bir şeye ihtiyacınız var mı? 🎉",
-            "Asıl ben teşekkür ederim! Sorularınız beni geliştiriyor! 💪"
+            "Ben teşekkür ederim! Başka bir şeye ihtiyacınız var mı? 🎉"
         ]
 
     def generate_response(self, message: str, user_id: str = "default") -> str:
@@ -843,7 +790,7 @@ class ResponseEngine:
             return "🌤️ Hangi şehir için hava durumu bilgisi istiyorsunuz?"
 
     def handle_person_info_intent(self, message: str) -> str:
-        """Kişi bilgisi sorgularını işler - TAM FİKS"""
+        """Kişi bilgisi sorgularını işler - SADECE GOOGLE SEARCH"""
         entities = nlu_engine.extract_entities(message)
         person_name = entities.get('person', '')
         
@@ -851,7 +798,6 @@ class ResponseEngine:
             person_name = nlu_engine.extract_person_name_from_text(nlu_engine.normalize_text(message))
         
         if not person_name:
-            # Eğer hala person_name yoksa, mesajdan kişi ismini çıkarmaya çalış
             cleaned_message = re.sub(r'\b(kimdir|kim|hakkında|biyografi|hayatı|kaç|nereli|ne iş yapar)\b', '', message, flags=re.IGNORECASE).strip()
             if cleaned_message and len(cleaned_message) > 3:
                 person_name = cleaned_message.title()
@@ -859,58 +805,24 @@ class ResponseEngine:
                 person_name = "Bu kişi"
 
         if person_name and person_name != "Bu kişi":
-            # OpenAI'a özel olarak kişi bilgisi için prompt gönder
-            prompt = (
-                f"'{person_name}' hakkında detaylı ve doğru bilgi ver. "
-                f"Lütfen şu bilgileri içeren kapsamlı bir biyografi sun:\n"
-                f"- Doğum tarihi ve yeri\n"
-                f"- Eğitim hayatı\n" 
-                f"- Kariyeri ve önemli pozisyonları\n"
-                f"- Başarıları ve eserleri\n"
-                f"- Önemli olaylar ve tarihler\n\n"
-                f"Bilgileri maddeler halinde ve net bir şekilde ver. "
-                f"Kendi cümlelerinle özetle ve doğru bilgiler ver."
-            )
+            # Google Search ile kişi bilgisi ara
+            search_query = f"{person_name} kimdir biyografi hayatı"
+            search_result = api_client.google_search(search_query)
             
-            logger.info(f"OpenAI prompt for person: {person_name}")
-            ai_response = api_client.openai_completion(prompt, max_tokens=600)
-            
-            if ai_response and len(ai_response) > 50:
-                return f"👤 {person_name} Hakkında:\n\n{ai_response}"
+            if search_result:
+                return f"👤 {person_name} Hakkında:\n\n{search_result}"
             else:
-                # OpenAI cevap vermezse Google search yap
-                search_query = f"{person_name} kimdir biyografi"
-                search_result = api_client.google_search(search_query)
-                if search_result:
-                    return f"🔍 {search_result}"
-                else:
-                    return f"🤔 {person_name} hakkında detaylı bilgi bulunamadı. Lütfen daha spesifik bir soru sorun."
+                return f"🤔 {person_name} hakkında detaylı bilgi bulunamadı. Lütfen daha spesifik bir soru sorun."
         
         return self.handle_knowledge_intent(message)
 
     def handle_knowledge_intent(self, message: str) -> str:
-        """Bilgi sorgularını işler"""
-        enhanced_prompt = (
-            f"Kullanıcı şunu sordu: '{message}'. "
-            f"Lütfen detaylı, kapsamlı ve doğru bir cevap ver. "
-            f"Eğer bir kişi, yer, olay veya kavram hakkındaysa:\n"
-            f"- Temel bilgileri ver\n"
-            f"- Önemli detayları ekle\n" 
-            f"- Tarihsel bağlamı açıkla\n"
-            f"- Güncel bilgileri dahil et\n"
-            f"Kendi cümlelerinle özetle ve bilgiyi düzenli sun."
-        )
-        
-        ai_response = api_client.openai_completion(enhanced_prompt, max_tokens=500)
-        
-        if ai_response and len(ai_response) > 30:
-            return f"🤖 {ai_response}"
-        
+        """Bilgi sorgularını işler - SADECE GOOGLE SEARCH"""
         search_result = api_client.google_search(message)
         if search_result:
-            return f"🔍 {search_result}"
+            return f"🔍 Arama Sonuçları:\n\n{search_result}"
         
-        return "🤔 Bu konuda yeterli bilgim bulunmuyor. Lütfen sorunuzu farklı şekilde ifade edin veya daha spesifik bir soru sorun."
+        return "🤔 Bu konuda yeterli bilgi bulunamadı. Lütfen sorunuzu farklı şekilde ifade edin veya daha spesifik bir soru sorun."
 
     def handle_unknown_intent(self, message: str, user_id: str) -> str:
         """Bilinmeyen intent'leri işler"""
@@ -925,13 +837,10 @@ class ResponseEngine:
         if math_result:
             return math_result
         
-        ai_response = api_client.openai_completion(
-            f"Kullanıcı şunu sordu: '{message}'. "
-            "Kısa, net ve bilgilendirici bir cevap ver."
-        )
-        
-        if ai_response:
-            return ai_response
+        # Bilinmeyen sorgular için Google Search
+        search_result = api_client.google_search(message)
+        if search_result:
+            return f"🔍 Arama Sonuçları:\n\n{search_result}"
         
         return "🤔 Anlayamadım, lütfen daha açıklayıcı şekilde sorabilir misiniz?"
 
@@ -990,16 +899,20 @@ def index():
     <body>
         <div class="container">
             <div class="header">
-                <h1>🚀 MELDRA AI v6.5</h1>
-                <p>KİŞİ SORGULARI TAM FİKS + OPENAI ENTEGRASYONU</p>
+                <h1>🚀 MELDRA AI v6.6</h1>
+                <p>GOOGLE SEARCH ÖNCELİKLİ - OPENAI YOK</p>
             </div>
             
             <div class="chat-container">
                 <div class="sidebar">
                     <div class="features-grid">
                         <div class="feature-card">
+                            <h4>🔍 GOOGLE SEARCH</h4>
+                            <p>OpenAI olmadan çalışıyor!</p>
+                        </div>
+                        <div class="feature-card">
                             <h4>👤 KİŞİ BİLGİLERİ</h4>
-                            <p>Artık kişi sorguları çalışıyor!</p>
+                            <p>Google Search ile kişi sorguları</p>
                         </div>
                         <div class="feature-card">
                             <h4>🧮 Süper Matematik</h4>
@@ -1009,15 +922,11 @@ def index():
                             <h4>👋 Selamlama</h4>
                             <p>Merhaba, selam çalışıyor</p>
                         </div>
-                        <div class="feature-card">
-                            <h4>🌤️ Hava Durumu</h4>
-                            <p>Gerçek zamanlı hava bilgileri</p>
-                        </div>
                     </div>
                     
                     <div class="api-status">
-                        <p><span class="status-dot"></span> Kişi Sorguları: AKTİF</p>
-                        <p><span class="status-dot"></span> OpenAI: ÇALIŞIYOR</p>
+                        <p><span class="status-dot"></span> Google Search: AKTİF</p>
+                        <p><span class="status-dot"></span> OpenAI: KAPALI</p>
                         <p><span class="status-dot"></span> Matematik: SORUNSUZ</p>
                     </div>
                     
@@ -1034,13 +943,13 @@ def index():
                 <div class="chat-area">
                     <div class="messages" id="messages">
                         <div class="message bot-message">
-                            🚀 <strong>MELDRA AI v6.5</strong> - KİŞİ SORGULARI TAM FİKS!<br><br>
-                            🎯 <strong>YENİ ÖZELLİKLER:</strong><br>
-                            • "recep tayyip erdoğan kimdir" = DETAYLI BİLGİ<br>
-                            • "atatürk kim" = DETAYLI BİLGİ<br>
-                            • Tüm kişi sorguları çalışıyor<br>
-                            • OpenAI entegrasyonu aktif<br><br>
-                            Hemen bir kişi sorusu sorun! 👤
+                            🚀 <strong>MELDRA AI v6.6</strong> - GOOGLE SEARCH ÖNCELİKLİ!<br><br>
+                            🎯 <strong>ÖZELLİKLER:</strong><br>
+                            • OpenAI KULLANMIYOR<br>
+                            • Google Search ile kişi bilgileri<br>
+                            • Matematik motoru yerel çalışıyor<br>
+                            • Hızlı ve güvenilir<br><br>
+                            Hemen bir soru sorun! 🔍
                         </div>
                     </div>
                     
@@ -1050,7 +959,7 @@ def index():
                     
                     <div class="input-area">
                         <div class="input-group">
-                            <input type="text" id="messageInput" placeholder="Kişi sorusu sorun..." autocomplete="off">
+                            <input type="text" id="messageInput" placeholder="Sorunuzu yazın..." autocomplete="off">
                             <button id="sendButton">Gönder</button>
                         </div>
                     </div>
@@ -1163,13 +1072,13 @@ def chat():
 def status():
     return jsonify({
         "status": "active", 
-        "version": "6.5.0",
+        "version": "6.6.0",
         "timestamp": datetime.now().isoformat(),
         "features": [
-            "KİŞİ SORGULARI TAM FİKS",
-            "OPENAI ENTEGRASYONU AKTİF", 
+            "GOOGLE SEARCH ÖNCELİKLİ",
+            "OPENAI KAPALI", 
             "MATEMATİK MOTORU SORUNSUZ",
-            "SELAMLAMA SİSTEMİ ÇALIŞIYOR"
+            "KİŞİ SORGULARI AKTİF"
         ],
         "statistics": {
             "active_users": len(conversation_history),
@@ -1195,13 +1104,13 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     
     print("🚀" * 60)
-    print("🚀 MELDRA AI v6.5 - KİŞİ SORGULARI TAM FİKS!")
+    print("🚀 MELDRA AI v6.6 - GOOGLE SEARCH ÖNCELİKLİ!")
     print("🚀 Port:", port)
     print("🚀 ÖZELLİKLER:")
-    print("🚀   • 'recep tayyip erdoğan kimdir' = DETAYLI BİLGİ")
-    print("🚀   • 'atatürk kim' = DETAYLI BİLGİ") 
-    print("🚀   • Tüm kişi sorguları çalışıyor")
-    print("🚀   • OpenAI entegrasyonu aktif")
+    print("🚀   • OpenAI KULLANMIYOR")
+    print("🚀   • Google Search ile kişi bilgileri") 
+    print("🚀   • Matematik motoru yerel çalışıyor")
+    print("🚀   • Hızlı ve güvenilir")
     print("🚀" * 60)
     
     app.run(host="0.0.0.0", port=port, debug=False)
