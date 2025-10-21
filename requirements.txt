@@ -17,8 +17,8 @@ markupsafe==3.0.3
 packaging==25.0
 
 # -----------------------------
-# Yapay zeka modelleri (CPU-only, build hatalarını önler)
-torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+# Yapay zeka modelleri (CPU-only ortam için)
+torch==2.5.1
 transformers==4.33.2
 numpy==2.1.2
 requests==2.32.3
