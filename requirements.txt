@@ -43,9 +43,8 @@ networkx==3.5
 sympy==1.13.1
 huggingface-hub==0.35.3
 hf_xet==1.1.10
-aiohttp==3.9.4
-speechrecognition==3.9.0
-speechrecognition==3.9.0
-Flask==2.3.3
-speechrecognition==3.9.0
+
+# -----------------------------
+# Asenkron ve ses tanıma
 aiohttp==3.9.5
+SpeechRecognition==3.9.0
