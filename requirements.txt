@@ -1,8 +1,8 @@
 # -----------------------------
-# Temel paket yöneticileri (build hatalarını önler)
+# Temel paket yöneticileri
 setuptools>=75.0.0
 wheel>=0.45.0
-pip>=25.1.1
+pip>=25.2
 
 # -----------------------------
 # Web sunucu ve framework
@@ -10,24 +10,23 @@ Flask==2.3.3
 gunicorn==21.2.0
 
 # -----------------------------
-# Yapay zeka modelleri (Render CPU ortamı ile uyumlu)
-torch==2.3.1
+# Yapay zeka modelleri
+torch==2.5.1
 transformers==4.33.2
 numpy==2.1.2
 requests==2.32.3
 
 # -----------------------------
-# Ek olarak sık kullanılan yardımcı kütüphaneler
+# Ek yardımcı kütüphaneler
 regex==2024.9.11
 tqdm==4.66.5
 sentencepiece==0.2.0
 safetensors==0.4.4
-tokenizers==0.13.2   # ✅ prebuilt wheel - Rust derlemesi gerekmez, Render'da çalışır
+tokenizers==0.13.3
 
 # -----------------------------
-# Render ortamında gerekebilecek destek paketleri
+# Render destek paketleri
 Jinja2==3.1.3
 Werkzeug==2.3.7
 itsdangerous==2.1.2
 click==8.1.7
-blinker>=1.6.2
