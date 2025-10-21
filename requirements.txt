@@ -22,7 +22,7 @@ regex==2024.9.11
 tqdm==4.66.5
 sentencepiece==0.2.0
 safetensors==0.4.4
-tokenizers==0.14.1
+tokenizers==0.13.3
 
 # -----------------------------
 # Render ortamında gerekebilecek destek paketleri
