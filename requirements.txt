@@ -1,11 +1,11 @@
 # -----------------------------
-# Temel paket yöneticileri (build hatalarını önler)
+# Paket yöneticileri
 setuptools>=75.0.0
 wheel>=0.45.0
 pip>=25.2
 
 # -----------------------------
-# Web sunucu ve framework
+# Web framework
 Flask==2.3.3
 gunicorn==21.2.0
 Jinja2==3.1.3
@@ -17,13 +17,13 @@ markupsafe==3.0.3
 packaging==25.0
 
 # -----------------------------
-# Yapay zeka modelleri (CPU-only ortam için)
+# AI paketleri (CPU-only, prebuilt wheel kullan)
 torch==2.5.1
-transformers==4.33.2
+transformers==4.36.0
 numpy==2.1.2
 requests==2.32.3
-sentencepiece==0.1.99
-tokenizers==0.13.3
+sentencepiece==0.1.99 --prefer-binary
+tokenizers==0.13.3 --prefer-binary
 safetensors==0.4.4
 tqdm==4.66.5
 regex==2024.9.11
