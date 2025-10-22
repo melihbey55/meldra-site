@@ -49,3 +49,5 @@ hf_xet==1.1.10
 aiohttp==3.9.5
 SpeechRecognition==3.9.0
 gTTS==2.5.1
+Pillow
+opencv-python-headless==4.9.0.80
