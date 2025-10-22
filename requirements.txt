@@ -23,7 +23,7 @@ packaging==25.0
 # Yapay zeka modelleri
 torch==2.5.1
 transformers==4.36.0
-numpy==2.1.2
+numpy==1.26.4
 requests==2.32.3
 sentencepiece==0.1.99
 tokenizers>=0.14,<0.19
