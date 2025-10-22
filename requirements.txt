@@ -48,3 +48,4 @@ hf_xet==1.1.10
 # Asenkron ve ses tanıma
 aiohttp==3.9.5
 SpeechRecognition==3.9.0
+gTTS==2.5.1
