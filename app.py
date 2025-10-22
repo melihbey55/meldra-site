@@ -351,9 +351,9 @@ class RealTimeDataEngine:
                     if response.status == 200:
                         data = await response.json()
                         rates = {
-                            'USD/TRY': data['rates'].get('TRY', 28.5),
-                            'EUR/TRY': data['rates'].get('TRY', 31.2) / data['rates'].get('EUR', 1.0),
-                            'GBP/TRY': data['rates'].get('TRY', 36.1) / data['rates'].get('GBP', 1.0)
+                            'USD/TRY': data['rates'].get('TRY', 44.5),
+                            'EUR/TRY': data['rates'].get('TRY', 50.2) / data['rates'].get('EUR', 1.0),
+                            'GBP/TRY': data['rates'].get('TRY', 60.1) / data['rates'].get('GBP', 1.0)
                         }
                         self.cache[cache_key] = {'data': rates, 'timestamp': time.time()}
                         return rates
