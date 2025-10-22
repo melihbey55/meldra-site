@@ -51,3 +51,4 @@ SpeechRecognition==3.9.0
 gTTS==2.5.1
 Pillow
 opencv-python-headless==4.9.0.80
+--use-pep517
